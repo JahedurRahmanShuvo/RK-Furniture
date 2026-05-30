@@ -25,12 +25,14 @@ export default function Navbar({
       <div className="flex items-center gap-2">
         <button
           onClick={onLogoClick}
-          className="flex items-center gap-1.5 focus:outline-none"
+          className="flex items-center gap-1.5 focus:outline-none cursor-pointer"
         >
-          <span className="font-extrabold tracking-tight text-xl text-slate-800 flex items-center font-sans">
-            RK<span className="text-[#c25927] font-medium font-sans">.</span>
-            <span className="text-[#15803d] font-sans ml-1 text-lg font-bold">FURNITURE</span>
-          </span>
+          <img
+            src="https://i.postimg.cc/63KXZNcz/20260530-101216.png"
+            alt="RK Furniture Logo"
+            className="h-10 sm:h-12 w-auto object-contain"
+            referrerPolicy="no-referrer"
+          />
         </button>
       </div>
 

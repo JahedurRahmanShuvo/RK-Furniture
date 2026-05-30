@@ -646,7 +646,12 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 pb-5 mb-6 gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xl font-black text-amber-500 tracking-wider">RK FURNITURE</span>
+            <img
+              src="https://i.postimg.cc/63KXZNcz/20260530-101216.png"
+              alt="RK Furniture Logo"
+              className="h-10 w-auto object-contain"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <p className="text-sm text-slate-700 mt-1 font-bold">
             Admin Dashboard
@@ -1998,10 +2003,12 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b pb-3 border-slate-100">
                 <div>
-                  <h4 className="font-extrabold tracking-tight text-lg text-slate-800">
-                    RK<span className="text-[#c25927] font-medium font-sans">.</span>
-                    <span className="text-[#15803d]">FURNITURE</span>
-                  </h4>
+                  <img
+                    src="https://i.postimg.cc/63KXZNcz/20260530-101216.png"
+                    alt="RK Furniture Logo"
+                    className="h-8 w-auto object-contain"
+                    referrerPolicy="no-referrer"
+                  />
                   <p className="text-[10px] text-slate-400 mt-0.5">Sandwip, Chittagong, Bangladesh</p>
                 </div>
                 <div className="text-right">
