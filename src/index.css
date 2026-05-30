@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Anek Bangla", sans-serif;
+  --font-mono: "Anek Bangla", sans-serif;
+  --font-serif: "Anek Bangla", sans-serif;
+  --color-primary-orange: #c25927;
+  --color-primary-green: #15803d;
+}
+
+* {
+  font-family: "Anek Bangla", sans-serif !important;
+}
+
+body {
+  font-family: "Anek Bangla", sans-serif !important;
+}
+
