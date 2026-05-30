@@ -66,19 +66,11 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
         {/* Right Details Panel */}
         <div className="flex flex-col justify-between space-y-4">
           <div className="space-y-2">
-            <span className="text-[10px] font-bold text-[#15803d] border border-[#15803d]/20 bg-emerald-50 px-2 py-0.5 rounded uppercase">
-              Handcrafted Unit
-            </span>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight font-sans">
               {prod.name}
             </h2>
-            {/* Rating decoration */}
-            <div className="flex items-center gap-1 text-amber-500 text-xs">
-              <span>★★★★★</span>
-              <span className="text-slate-400 font-semibold">(5.0 Store Avg Ref)</span>
-            </div>
             <div className="text-2xl font-extrabold text-[#c25927] pt-1">
-              {prod.price.toLocaleString()}د.إ
+              {prod.price.toLocaleString()} AED
             </div>
           </div>
 

@@ -15,6 +15,7 @@ const ORDERS_DB_PATH = path.join(process.cwd(), 'db_orders.json');
 const USERS_DB_PATH = path.join(process.cwd(), 'db_users.json');
 const SLIDES_DB_PATH = path.join(process.cwd(), 'db_slides.json');
 const CATEGORIES_DB_PATH = path.join(process.cwd(), 'db_categories.json');
+const SHIPPING_AREAS_DB_PATH = path.join(process.cwd(), 'db_shipping_areas.json');
 
 // Helper function to read/write JSON databases
 function readJSONFile(filePath: string, defaultValue: any) {
@@ -69,7 +70,63 @@ if (!usersDB['01700000000']) {
 }
 
 // Initial Data structures matching front-end data
-const INITIAL_PRODUCTS: any[] = [];
+const INITIAL_PRODUCTS = [
+  {
+    id: 'prod_1',
+    name: 'Royal Mahogany Sofa Set',
+    price: 3200,
+    oldPrice: 4500,
+    category: 'Sofa',
+    description: 'Immerse Yourself in ultimate luxury. Premium quality solid mahogany wood framed royal sofa with high-density plush comfort padding and luxurious upholstery.',
+    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80'],
+    isTrending: true
+  },
+  {
+    id: 'prod_2',
+    name: 'Premium King Size Bed',
+    price: 4200,
+    oldPrice: 5500,
+    category: 'Bed',
+    description: 'Beautifully crafted premium king-size bed made from season-treated premium Malaysian timber, offering durability and classic mid-century royalty design.',
+    image: 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=600&q=80'],
+    isTrending: true
+  },
+  {
+    id: 'prod_3',
+    name: 'Classic Wooden Dinning Set',
+    price: 2400,
+    oldPrice: 3200,
+    category: 'Dining',
+    description: 'High polish mahogany wood dining table with 6 comfortable cushioned dining chairs. Resilien gloss lacquer shielding from food & drink spills.',
+    image: 'https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=600&q=80'],
+    isTrending: false
+  },
+  {
+    id: 'prod_4',
+    name: 'Modern Wardrobe Cabinet',
+    price: 1950,
+    oldPrice: 2600,
+    category: 'Wardrobe',
+    description: 'An expansive three-door wardrobe cabinet. Comes with integrated inner drawers, hanging rails, and vanity mirror setup.',
+    image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'],
+    isTrending: false
+  },
+  {
+    id: 'prod_5',
+    name: 'Cozy Retro Accent Chair',
+    price: 850,
+    oldPrice: 1200,
+    category: 'Sofa',
+    description: 'Add a vintage aesthetic touch to your reading lounge or study corner. Constructed from steam-bent Teak wood frame.',
+    image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80'],
+    isTrending: true
+  }
+];
 const INITIAL_ORDERS: any[] = [];
 const INITIAL_SLIDES = [
   {
@@ -104,38 +161,55 @@ const INITIAL_SLIDES = [
   }
 ];
 
-const INITIAL_CATEGORIES: any[] = [];
+const INITIAL_CATEGORIES = [
+  {
+    id: 'cat_sofa',
+    name: 'Sofa',
+    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=400&q=80'
+  },
+  {
+    id: 'cat_bed',
+    name: 'Bed',
+    image: 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=400&q=80'
+  },
+  {
+    id: 'cat_dining',
+    name: 'Dining',
+    image: 'https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=400&q=80'
+  },
+  {
+    id: 'cat_wardrobe',
+    name: 'Wardrobe',
+    image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=400&q=80'
+  }
+];
 
-// Force clean-up of saved mock products, categories and orders on sandboxed disk to start totally empty
+const INITIAL_SHIPPING_AREAS = [
+  { id: 'ship_1', name: 'Dubai', charge: 30 },
+  { id: 'ship_2', name: 'Abu Dhabi', charge: 50 },
+  { id: 'ship_3', name: 'Sharjah & Ajman', charge: 40 },
+  { id: 'ship_4', name: 'Other Emirates', charge: 60 }
+];
+
+// Seed DBs with initial products and categories if empty
 try {
-  if (fs.existsSync(PRODUCTS_DB_PATH)) {
-    const data = fs.readFileSync(PRODUCTS_DB_PATH, 'utf-8');
-    if (data.includes('montana_bed') || data.includes('restoric_sofa')) {
-      fs.writeFileSync(PRODUCTS_DB_PATH, JSON.stringify([], null, 2), 'utf-8');
-    }
-  } else {
-    fs.writeFileSync(PRODUCTS_DB_PATH, JSON.stringify([], null, 2), 'utf-8');
+  if (!fs.existsSync(PRODUCTS_DB_PATH) || fs.readFileSync(PRODUCTS_DB_PATH, 'utf-8').trim() === '[]' || fs.readFileSync(PRODUCTS_DB_PATH, 'utf-8').trim() === '') {
+    fs.writeFileSync(PRODUCTS_DB_PATH, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf-8');
   }
-
-  if (fs.existsSync(CATEGORIES_DB_PATH)) {
-    const data = fs.readFileSync(CATEGORIES_DB_PATH, 'utf-8');
-    if (data.includes('furniture') || data.includes('bedroom')) {
-      fs.writeFileSync(CATEGORIES_DB_PATH, JSON.stringify([], null, 2), 'utf-8');
-    }
-  } else {
-    fs.writeFileSync(CATEGORIES_DB_PATH, JSON.stringify([], null, 2), 'utf-8');
+  if (!fs.existsSync(CATEGORIES_DB_PATH) || fs.readFileSync(CATEGORIES_DB_PATH, 'utf-8').trim() === '[]' || fs.readFileSync(CATEGORIES_DB_PATH, 'utf-8').trim() === '') {
+    fs.writeFileSync(CATEGORIES_DB_PATH, JSON.stringify(INITIAL_CATEGORIES, null, 2), 'utf-8');
   }
-
-  if (fs.existsSync(ORDERS_DB_PATH)) {
-    const data = fs.readFileSync(ORDERS_DB_PATH, 'utf-8');
-    if (data.includes('20260524-11275833')) {
-      fs.writeFileSync(ORDERS_DB_PATH, JSON.stringify([], null, 2), 'utf-8');
-    }
-  } else {
-    fs.writeFileSync(ORDERS_DB_PATH, JSON.stringify([], null, 2), 'utf-8');
+  if (!fs.existsSync(ORDERS_DB_PATH)) {
+    fs.writeFileSync(ORDERS_DB_PATH, JSON.stringify(INITIAL_ORDERS, null, 2), 'utf-8');
+  }
+  if (!fs.existsSync(SLIDES_DB_PATH) || fs.readFileSync(SLIDES_DB_PATH, 'utf-8').trim() === '[]' || fs.readFileSync(SLIDES_DB_PATH, 'utf-8').trim() === '') {
+    fs.writeFileSync(SLIDES_DB_PATH, JSON.stringify(INITIAL_SLIDES, null, 2), 'utf-8');
+  }
+  if (!fs.existsSync(SHIPPING_AREAS_DB_PATH) || fs.readFileSync(SHIPPING_AREAS_DB_PATH, 'utf-8').trim() === '[]' || fs.readFileSync(SHIPPING_AREAS_DB_PATH, 'utf-8').trim() === '') {
+    fs.writeFileSync(SHIPPING_AREAS_DB_PATH, JSON.stringify(INITIAL_SHIPPING_AREAS, null, 2), 'utf-8');
   }
 } catch (e) {
-  console.error('Error performing DB force initialization:', e);
+  console.error('Error performing DB initial seeding:', e);
 }
 
 // -------------------------------------------------------------
@@ -285,6 +359,37 @@ app.delete('/api/categories/:id', (req, res) => {
   categories = categories.filter((c: any) => c.id !== id);
   writeJSONFile(CATEGORIES_DB_PATH, categories);
   res.json({ success: true, message: 'Category deleted' });
+});
+
+// SHIPPING AREAS ENDPOINTS
+app.get('/api/shipping-areas', (req, res) => {
+  const areas = readJSONFile(SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
+  res.json(areas);
+});
+
+app.post('/api/shipping-areas', (req, res) => {
+  const areas = readJSONFile(SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
+  const newArea = req.body;
+  if (!newArea.id) {
+    newArea.id = 'ship_' + Date.now();
+  }
+  const existingIndex = areas.findIndex((a: any) => a.id === newArea.id || a.name.toLowerCase() === newArea.name.toLowerCase());
+  if (existingIndex !== -1) {
+    areas[existingIndex] = { ...areas[existingIndex], ...newArea, charge: Number(newArea.charge) };
+  } else {
+    newArea.charge = Number(newArea.charge);
+    areas.push(newArea);
+  }
+  writeJSONFile(SHIPPING_AREAS_DB_PATH, areas);
+  res.status(201).json(newArea);
+});
+
+app.delete('/api/shipping-areas/:id', (req, res) => {
+  const { id } = req.params;
+  let areas = readJSONFile(SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
+  areas = areas.filter((a: any) => a.id !== id);
+  writeJSONFile(SHIPPING_AREAS_DB_PATH, areas);
+  res.json({ success: true, message: 'Shipping area deleted' });
 });
 
 // 4. ACTIVE SESSIONS MONITORING

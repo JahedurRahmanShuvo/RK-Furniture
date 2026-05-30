@@ -81,19 +81,47 @@ const DEFAULT_SLIDES = [
 ];
 
 const DEFAULT_CATEGORIES = [
-  { id: 'cat_sofa', name: 'Sofa' },
-  { id: 'cat_bed', name: 'Bed' },
-  { id: 'cat_dining', name: 'Dining' },
-  { id: 'cat_wardrobe', name: 'Wardrobe' }
+  { 
+    id: 'cat_sofa', 
+    name: 'Sofa', 
+    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=400&q=80' 
+  },
+  { 
+    id: 'cat_bed', 
+    name: 'Bed', 
+    image: 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=400&q=80' 
+  },
+  { 
+    id: 'cat_dining', 
+    name: 'Dining', 
+    image: 'https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=400&q=80' 
+  },
+  { 
+    id: 'cat_wardrobe', 
+    name: 'Wardrobe', 
+    image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=400&q=80' 
+  }
 ];
 
 const DEFAULT_USERS = {
+  '01700555555': {
+    name: 'RK Furniture Admin',
+    email: 'admin@rkfurniture.com',
+    password: 'rkfurniture0123'
+  },
   '01700000000': {
     name: 'RK Furniture Admin',
     email: 'admin@rkfurniture.com',
     password: 'rkfurniture0123'
   }
 };
+
+const DEFAULT_SHIPPING_AREAS = [
+  { id: 'ship_1', name: 'Dubai', charge: 30 },
+  { id: 'ship_2', name: 'Abu Dhabi', charge: 50 },
+  { id: 'ship_3', name: 'Sharjah & Ajman', charge: 40 },
+  { id: 'ship_4', name: 'Other Emirates', charge: 60 }
+];
 
 // Global in-memory active sessions mapping
 const activeSessions: { [id: string]: any } = {};
@@ -256,6 +284,34 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
       const filtered = currentCategories.filter((c: any) => c.id !== idValue);
       setStored('netlify_categories', filtered);
       responseData = { success: true, message: 'Category deleted' };
+    }
+  }
+
+  // 3b. SHIPPING AREAS
+  else if (resource === 'shipping-areas') {
+    const currentAreas = getStored('netlify_shipping_areas', DEFAULT_SHIPPING_AREAS);
+
+    if (method === 'GET') {
+      responseData = currentAreas;
+    } else if (method === 'POST') {
+      const payload = JSON.parse(init?.body as string);
+      if (!payload.id) {
+        payload.id = 'ship_' + Date.now();
+      }
+      payload.charge = Number(payload.charge);
+      const existingIdx = currentAreas.findIndex((a: any) => a.id === payload.id || a.name.toLowerCase() === payload.name.toLowerCase());
+      if (existingIdx !== -1) {
+        currentAreas[existingIdx] = { ...currentAreas[existingIdx], ...payload };
+      } else {
+        currentAreas.push(payload);
+      }
+      setStored('netlify_shipping_areas', currentAreas);
+      responseData = payload;
+      status = 201;
+    } else if (method === 'DELETE' && idValue) {
+      const filtered = currentAreas.filter((a: any) => a.id !== idValue);
+      setStored('netlify_shipping_areas', filtered);
+      responseData = { success: true, message: 'Shipping area deleted' };
     }
   }
 

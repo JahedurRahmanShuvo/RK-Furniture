@@ -62,7 +62,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   
   // Tab states
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'sessions' | 'security' | 'hero_banner' | 'categories'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'sessions' | 'security' | 'hero_banner' | 'categories' | 'shipping_areas'>('orders');
 
   // Search & Filter states - Orders
   const [orderQuery, setOrderQuery] = useState('');
@@ -117,6 +117,13 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [catName, setCatName] = useState('');
   const [catImage, setCatImage] = useState('');
 
+  // Shipping areas customization states
+  const [shippingAreas, setShippingAreas] = useState<any[]>([]);
+  const [isAddingShippingArea, setIsAddingShippingArea] = useState(false);
+  const [shipName, setShipName] = useState('');
+  const [shipCharge, setShipCharge] = useState<number>(0);
+  const [editingShipId, setEditingShipId] = useState<string | null>(null);
+
   // Load backend statistics
   const fetchAllData = () => {
     // 1. Fetch Orders from Express persistent server
@@ -169,6 +176,16 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         }
       })
       .catch((err) => console.error('Admin API error loading categories:', err));
+
+    // 6. Fetch Shipping Areas
+    fetch('/api/shipping-areas')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setShippingAreas(data);
+        }
+      })
+      .catch((err) => console.error('Admin API error loading shipping areas:', err));
   };
 
   useEffect(() => {
@@ -425,6 +442,53 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       .catch((err) => {
         console.error('Failed to delete category:', err);
         showToast('Failed to delete category.', 'error');
+      });
+  };
+
+  const handleSaveShippingArea = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shipName) {
+      showToast('Shipping area name is required!', 'error');
+      return;
+    }
+    const payload = {
+      id: editingShipId || undefined,
+      name: shipName,
+      charge: Number(shipCharge)
+    };
+
+    fetch('/api/shipping-areas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then((res) => res.json())
+      .then(() => {
+        setIsAddingShippingArea(false);
+        setEditingShipId(null);
+        setShipName('');
+        setShipCharge(0);
+        fetchAllData();
+        showToast('Shipping area saved & published!', 'success');
+      })
+      .catch((err) => {
+        console.error('Failed to save shipping area:', err);
+        showToast('Failed to save shipping area.', 'error');
+      });
+  };
+
+  const handleDeleteShippingArea = (shipId: string) => {
+    fetch(`/api/shipping-areas/${shipId}`, {
+      method: 'DELETE'
+    })
+      .then((res) => res.json())
+      .then(() => {
+        fetchAllData();
+        showToast('Shipping area deleted successfully.', 'info');
+      })
+      .catch((err) => {
+        console.error('Failed to delete shipping area:', err);
+        showToast('Failed to delete shipping area.', 'error');
       });
   };
 
@@ -767,7 +831,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="grow pr-2 text-left">
                   <p className="text-[10px] sm:text-[11px] font-black text-pink-700 uppercase tracking-tight">Today Orders: {todayOrdersCount}</p>
                   <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
-                    ৳{todayOrdersRevenue.toLocaleString()}
+                    {todayOrdersRevenue.toLocaleString()} AED
                   </p>
                 </div>
                 <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-pink-400 bg-pink-100 shadow-sm shrink-0">
@@ -796,7 +860,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="grow pr-2 text-left">
                   <p className="text-[10px] sm:text-[11px] font-black text-purple-700 uppercase tracking-tight">Today Courier Orders: {todayCourierCount}</p>
                   <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
-                    ৳{todayCourierRevenue.toLocaleString()}
+                    {todayCourierRevenue.toLocaleString()} AED
                   </p>
                 </div>
                 <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-purple-400 bg-purple-100 shadow-sm shrink-0">
@@ -825,7 +889,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="grow pr-2 text-left">
                   <p className="text-[10px] sm:text-[11px] font-black text-emerald-700 uppercase tracking-tight">Confirmed Orders: {confirmedCount}</p>
                   <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
-                    ৳{confirmedRevenue.toLocaleString()}
+                    {confirmedRevenue.toLocaleString()} AED
                   </p>
                 </div>
                 <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-emerald-400 bg-emerald-100 shadow-sm shrink-0">
@@ -854,7 +918,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="grow pr-2 text-left">
                   <p className="text-[10px] sm:text-[11px] font-black text-indigo-700 uppercase tracking-tight">Pending Orders: {pendingCount}</p>
                   <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
-                    ৳{pendingRevenue.toLocaleString()}
+                    {pendingRevenue.toLocaleString()} AED
                   </p>
                 </div>
                 <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-indigo-400 bg-indigo-100 shadow-sm shrink-0">
@@ -883,7 +947,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="grow pr-2 text-left">
                   <p className="text-[10px] sm:text-[11px] font-black text-orange-700 uppercase tracking-tight">Hold Orders: {holdOrdersCount}</p>
                   <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
-                    ৳{holdRevenue.toLocaleString()}
+                    {holdRevenue.toLocaleString()} AED
                   </p>
                 </div>
                 <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-orange-400 bg-orange-100 shadow-sm shrink-0">
@@ -912,7 +976,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="grow pr-2 text-left">
                   <p className="text-[10px] sm:text-[11px] font-black text-cyan-700 uppercase tracking-tight">Cancelled Orders: {cancelledOrdersCount}</p>
                   <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
-                    ৳{cancelledRevenue.toLocaleString()}
+                    {cancelledRevenue.toLocaleString()} AED
                   </p>
                 </div>
                 <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-cyan-400 bg-cyan-100 shadow-sm shrink-0">
@@ -1040,6 +1104,22 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">Settings Code</span>
               <span className="text-[8px] sm:text-[9px] text-pink-700 font-bold block mt-0.5 font-mono">Key Settings</span>
             </button>
+
+            {/* 7. Shipping Areas */}
+            <button 
+              onClick={() => {
+                setActiveTab('shipping_areas');
+                showToast('Opened shipping charges manager.', 'info');
+              }}
+              className="bg-[#fffbeb] border border-amber-100 p-4 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 active:scale-95 group focus:outline-none cursor-pointer h-28"
+            >
+              <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-amber-400 bg-amber-100 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
+                <div className="absolute inset-0.5 rounded-full border border-amber-300/60" />
+                <Truck className="w-5 h-5 text-amber-600 z-10" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">Shipping Zones</span>
+              <span className="text-[8px] sm:text-[9px] text-amber-700 font-bold block mt-0.5 font-mono">Zones {shippingAreas.length}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1060,6 +1140,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               {activeTab === 'hero_banner' && 'Slide Banners'}
               {activeTab === 'categories' && 'Categories Catalog'}
               {activeTab === 'security' && 'Security Settings'}
+              {activeTab === 'shipping_areas' && 'Shipping Zones & Charges Manager'}
             </span>
           </div>
 
@@ -1160,7 +1241,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
                           <div>
                             <span className="text-slate-500 block font-bold mb-0.5">Billing Summary</span>
-                            <span className="text-slate-800 font-bold block font-mono">Total: ৳{ord.total.toLocaleString()}</span>
+                            <span className="text-slate-800 font-bold block font-mono">Total: {ord.total.toLocaleString()} AED</span>
                             <span className="text-[10px] text-slate-600">
                               {ord.products.reduce((sum, p) => sum + p.quantity, 0)} Items • Pay: {ord.paymentMethod}
                             </span>
@@ -1266,9 +1347,9 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                       </div>
                       
                       <p className="text-xs font-semibold text-slate-700 font-mono">
-                        ৳{prod.price.toLocaleString()}
+                        {prod.price.toLocaleString()} AED
                         {prod.oldPrice && (
-                          <span className="text-[10px] text-slate-400 line-through ml-2">৳{prod.oldPrice}</span>
+                          <span className="text-[10px] text-slate-400 line-through ml-2">{prod.oldPrice} AED</span>
                         )}
                       </p>
 
@@ -1712,6 +1793,135 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
             </div>
           )}
 
+          {/* 5. SHIPPING AREAS TAB */}
+          {activeTab === 'shipping_areas' && (
+            <div className="space-y-6 text-left">
+              <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-base">All Shipping Areas & Charges</h3>
+                  <p className="text-xs text-slate-400">Configure regional shipping and delivery charges in AED</p>
+                </div>
+                {!isAddingShippingArea && !editingShipId && (
+                  <button
+                    onClick={() => {
+                      setIsAddingShippingArea(true);
+                      setEditingShipId(null);
+                      setShipName('');
+                      setShipCharge(0);
+                    }}
+                    className="bg-amber-500 hover:bg-amber-600 font-extrabold text-[#111827] text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add New Zone</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Form to Add or Edit Shipping Area */}
+              {(isAddingShippingArea || editingShipId) && (
+                <div className="bg-slate-50 border border-amber-200/40 p-4 rounded-2xl max-w-md animation-fade-in space-y-4">
+                  <h4 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                    {editingShipId ? '🛠️ Edit Shipping Zone' : '✨ Add New Shipping Zone'}
+                  </h4>
+                  <form onSubmit={handleSaveShippingArea} className="space-y-4 text-xs">
+                    <div className="space-y-1">
+                      <label className="text-slate-650 font-bold block">Shipping Zone Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Dubai, Sharjah, Other Emirates, Global Delivery..."
+                        value={shipName}
+                        onChange={(e) => setShipName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded p-2.5 focus:outline-none focus:border-amber-500 text-slate-800 font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-slate-650 font-bold block">Delivery Charge (AED) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        placeholder="e.g. 50"
+                        value={shipCharge}
+                        onChange={(e) => setShipCharge(Number(e.target.value))}
+                        className="w-full bg-white border border-slate-200 rounded p-2.5 focus:outline-none focus:border-amber-500 text-slate-800 font-mono font-semibold"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        className="bg-amber-500 hover:bg-amber-600 font-extrabold text-[#111827] px-4 py-2 rounded transition cursor-pointer"
+                      >
+                        {editingShipId ? 'Save Changes' : 'Publish Zone'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingShippingArea(false);
+                          setEditingShipId(null);
+                          setShipName('');
+                          setShipCharge(0);
+                        }}
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-705 font-extrabold px-4 py-2 rounded transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* List of current shipping zones */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {shippingAreas.map((area) => (
+                  <div key={area.id} className="border border-slate-200 bg-slate-50 shadow-sm rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[#15803d]" />
+                        <span className="font-extrabold text-slate-800 text-sm">{area.name}</span>
+                      </div>
+                      <p className="text-xs font-bold text-[#15803d] font-mono mt-1.5">
+                        Charge: {area.charge} AED
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 border-t border-slate-100 pt-3 mt-1 text-[11px]">
+                      <button
+                        onClick={() => {
+                          setEditingShipId(area.id);
+                          setIsAddingShippingArea(false);
+                          setShipName(area.name);
+                          setShipCharge(area.charge);
+                        }}
+                        className="text-amber-600 hover:text-amber-700 font-extrabold hover:underline flex items-center gap-1 focus:outline-none cursor-pointer"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to delete ${area.name}?`)) {
+                            handleDeleteShippingArea(area.id);
+                          }
+                        }}
+                        className="text-rose-600 hover:text-rose-700 font-extrabold hover:underline flex items-center gap-1 ml-auto focus:outline-none cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {shippingAreas.length === 0 && (
+                <div className="text-center py-8 text-xs text-slate-400 font-sans">
+                  No custom shipping areas configured. Click on "Add New Zone" to create one.
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -1770,7 +1980,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-505 block">Price (৳) *</label>
+                  <label className="font-bold text-slate-505 block">Price (AED) *</label>
                   <input 
                     type="number" 
                     required 
@@ -1782,7 +1992,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-505 block">Strikeout Price (৳)</label>
+                  <label className="font-bold text-slate-505 block">Strikeout Price (AED)</label>
                   <input 
                     type="number" 
                     placeholder="Optional original price"
@@ -1916,15 +2126,31 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-550 block">Shipping Location Zone</label>
+                <label className="font-bold text-slate-555 block">Shipping Location Zone</label>
                 <select 
                   value={editingOrder.shippingArea}
-                  onChange={(e) => setEditingOrder({ ...editingOrder, shippingArea: e.target.value as any })}
+                  onChange={(e) => {
+                    const selArea = shippingAreas.find(a => a.id === e.target.value || a.name === e.target.value);
+                    const newCharge = selArea ? selArea.charge : 0;
+                    setEditingOrder({ 
+                      ...editingOrder, 
+                      shippingArea: selArea ? selArea.name : e.target.value,
+                      shippingCharge: newCharge
+                    });
+                  }}
                   className="w-full bg-white border border-slate-300 rounded p-2 text-slate-850 outline-none cursor-pointer focus:border-amber-500"
                 >
-                  <option value="inside">Inside Dhaka (৳ 60)</option>
-                  <option value="outside">Outside Dhaka (৳ 120)</option>
-                  <option value="global">Express Delivery (৳ 150)</option>
+                  {shippingAreas.map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.name} ({area.charge} AED)
+                    </option>
+                  ))}
+                  {shippingAreas.length === 0 && (
+                    <>
+                      <option value="inside">Dubai (50 AED)</option>
+                      <option value="outside">Abu Dhabi (100 AED)</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -1941,7 +2167,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-555 block">Total Due (৳)</label>
+                  <label className="font-bold text-slate-555 block">Total Due (AED)</label>
                   <input 
                     type="number" 
                     required 
@@ -2044,7 +2270,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     <div key={id} className="py-2 flex items-center justify-between text-xs">
                       <span className="flex-1 font-bold text-slate-800 leading-normal">{item.product.name}</span>
                       <span className="w-16 text-center text-slate-500 font-bold">{item.quantity}</span>
-                      <span className="w-20 text-right font-mono font-bold text-slate-700">৳{item.product.price.toLocaleString()}</span>
+                      <span className="w-20 text-right font-mono font-bold text-slate-700">{item.product.price.toLocaleString()} AED</span>
                     </div>
                   ))}
                 </div>
@@ -2054,15 +2280,15 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="flex flex-col items-end gap-1 text-xs text-slate-600 bg-slate-50/50 p-3 rounded-xl border border-slate-100 mt-2">
                 <div className="w-full flex justify-between sm:max-w-[200px]">
                   <span>Subtotal:</span>
-                  <span className="font-mono text-slate-700">৳{(viewingOrderInvoice.total - viewingOrderInvoice.shippingCharge).toLocaleString()}</span>
+                  <span className="font-mono text-slate-700">{(viewingOrderInvoice.total - viewingOrderInvoice.shippingCharge).toLocaleString()} AED</span>
                 </div>
                 <div className="w-full flex justify-between sm:max-w-[200px]">
                   <span>Shipping charge:</span>
-                  <span className="font-mono text-slate-700">৳{viewingOrderInvoice.shippingCharge.toLocaleString()}</span>
+                  <span className="font-mono text-slate-700">{viewingOrderInvoice.shippingCharge.toLocaleString()} AED</span>
                 </div>
                 <div className="w-full flex justify-between sm:max-w-[200px] border-t pt-1.5 font-extrabold text-slate-900 text-sm">
                   <span>Grand Total:</span>
-                  <span className="font-mono text-amber-600">৳{viewingOrderInvoice.total.toLocaleString()}</span>
+                  <span className="font-mono text-[#c25927]">{viewingOrderInvoice.total.toLocaleString()} AED</span>
                 </div>
               </div>
             </div>

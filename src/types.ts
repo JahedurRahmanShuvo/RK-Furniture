@@ -24,7 +24,7 @@ export interface Order {
   customerName: string;
   customerMobile: string;
   deliveryAddress: string;
-  shippingArea: 'inside' | 'outside' | 'global';
+  shippingArea: string;
   shippingCharge: number;
   paymentMethod: string;
   subtotal: number;
@@ -51,4 +51,10 @@ export interface UserProfile {
   phone: string;
   email: string;
   isLoggedIn: boolean;
+}
+
+export interface ShippingArea {
+  id: string;
+  name: string;
+  charge: number;
 }

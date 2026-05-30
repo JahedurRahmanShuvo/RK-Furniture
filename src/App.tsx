@@ -16,6 +16,7 @@ import {
   MessageSquare,
   ChevronRight,
   ArrowLeft,
+  ArrowRight,
   Plus,
   Minus,
   X,
@@ -39,14 +40,21 @@ import BottomNav from './components/BottomNav';
 import Navbar from './components/Navbar';
 import ProductDetailView from './components/ProductDetailView';
 import AdminDashboard from './components/AdminDashboard';
+import { auth } from './firebase';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut,
+  updateProfile 
+} from 'firebase/auth';
 
 const toBengaliNumber = (num: number): string => {
   const formatted = Math.round(num).toLocaleString('en-US'); // inserts commas
   return 'AED ' + formatted;
 };
 
-const CabinetIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+const CabinetIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
+  <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={`shrink-0 ${className}`}>
     {/* Main cabinet outer box */}
     <rect x="8" y="8" width="32" height="34" rx="2" fill="#E2A76F" stroke="#4A2F13" strokeWidth="3" />
     
@@ -109,6 +117,12 @@ export default function App() {
 
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [categories, setCategories] = useState<any[]>([]);
+  const [shippingAreas, setShippingAreas] = useState<any[]>([
+    { id: 'ship_1', name: 'Dubai', charge: 30 },
+    { id: 'ship_2', name: 'Abu Dhabi', charge: 50 },
+    { id: 'ship_3', name: 'Sharjah & Ajman', charge: 40 },
+    { id: 'ship_4', name: 'Other Emirates', charge: 60 }
+  ]);
 
   // Synchronize orders, products, and users with global server databases on startup
   useEffect(() => {
@@ -156,6 +170,16 @@ export default function App() {
         }
       })
       .catch((err) => console.error('Failed to sync categories from server:', err));
+
+    fetch('/api/shipping-areas')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setShippingAreas(data);
+          setCheckoutArea(data[0].id);
+        }
+      })
+      .catch((err) => console.error('Failed to sync shipping areas from server:', err));
   }, []);
 
   // --- Active Viewer Session Heartbeat ---
@@ -274,7 +298,7 @@ export default function App() {
   const [checkoutName, setCheckoutName] = useState('');
   const [checkoutMobile, setCheckoutMobile] = useState('');
   const [checkoutAddress, setCheckoutAddress] = useState('');
-  const [checkoutArea, setCheckoutArea] = useState<'inside' | 'outside' | 'global'>('inside');
+  const [checkoutArea, setCheckoutArea] = useState<string>('ship_1');
   const [checkoutGlobalCountry, setCheckoutGlobalCountry] = useState('');
   const [checkoutGlobalCity, setCheckoutGlobalCity] = useState('');
   const [checkoutNote, setCheckoutNote] = useState('');
@@ -417,12 +441,8 @@ export default function App() {
     });
 
     const discount = promoApplied ? subtotal * 0.1 : 0; // 10% coupon
-    const shippingCharge = 
-      checkoutArea === 'inside' 
-        ? SHIPPING_RATES.inside.charge 
-        : checkoutArea === 'outside' 
-          ? SHIPPING_RATES.outside.charge 
-          : SHIPPING_RATES.global.charge;
+    const selectedAreaObj = shippingAreas.find((a) => a.id === checkoutArea || a.name === checkoutArea);
+    const shippingCharge = selectedAreaObj ? selectedAreaObj.charge : (shippingAreas[0]?.charge || 0);
     const total = subtotal - discount + shippingCharge;
 
     return { subtotal, discount, shippingCharge, total };
@@ -437,7 +457,7 @@ export default function App() {
   };
 
   // --- Authentication Handlers ---
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginPhone || !loginPassword) {
       setAuthError('Please fill in all fields');
@@ -448,6 +468,20 @@ export default function App() {
     const adminPassword = localStorage.getItem('rk_admin_password') || 'rkfurniture0123';
     if (loginPhone === '01700000000') {
       if (loginPassword === adminPassword) {
+        // Log into Firebase Auth as admin
+        try {
+          const adminEmail = 'admin@rkfurniture.com';
+          try {
+            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+          } catch (fbErr: any) {
+            if (fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/invalid-credential') {
+              try {
+                await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
+
         setUser({
           name: 'RK Furniture Admin',
           phone: '01700000000',
@@ -474,6 +508,31 @@ export default function App() {
       setAuthError('Incorrect password. Please try again.');
       return;
     }
+
+    // Firebase Auth Authentication Integration
+    const targetEmail = registered.email || `${loginPhone}@rkfurniture.com`;
+    try {
+      await signInWithEmailAndPassword(auth, targetEmail, loginPassword);
+    } catch (fbError: any) {
+      // Auto-migrate user to Firebase Auth if they exist in DB/localStorage but are missing in Firebase Auth
+      if (fbError.code === 'auth/user-not-found' || fbError.code === 'auth/invalid-credential') {
+        try {
+          await createUserWithEmailAndPassword(auth, targetEmail, loginPassword);
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            await updateProfile(currentUser, { displayName: registered.name });
+          }
+        } catch (signupErr: any) {
+          console.error('Firebase auto-migration failed:', signupErr);
+          setAuthError('Firebase Auth Error: ' + signupErr.message);
+          return;
+        }
+      } else {
+        setAuthError('Firebase Auth Error: ' + fbError.message);
+        return;
+      }
+    }
+
     setUser({
       name: registered.name,
       phone: loginPhone,
@@ -490,7 +549,7 @@ export default function App() {
     setCurrentTab('profile');
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signupName || !signupPhone || !signupPassword || !signupConfirmPassword) {
       setAuthError('Please fill in all asterisks (*) fields');
@@ -506,6 +565,19 @@ export default function App() {
     }
     if (signupPassword !== signupConfirmPassword) {
       setAuthError('Passwords do not match.');
+      return;
+    }
+
+    // Connect to Firebase Authentication
+    const targetEmail = signupEmail || `${signupPhone}@rkfurniture.com`;
+    try {
+      const userCred = await createUserWithEmailAndPassword(auth, targetEmail, signupPassword);
+      if (userCred.user) {
+        await updateProfile(userCred.user, { displayName: signupName });
+      }
+    } catch (fbError: any) {
+      console.error('Firebase Auth Signup Error:', fbError);
+      setAuthError('Firebase Auth Error: ' + fbError.message);
       return;
     }
     
@@ -547,7 +619,12 @@ export default function App() {
     setCurrentTab('profile');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Firebase Auth logout error:', err);
+    }
     setUser({ name: '', phone: '', email: '', isLoggedIn: false });
     setView('home');
     setCurrentTab('home');
@@ -639,8 +716,10 @@ export default function App() {
       String(dateObj.getDate()).padStart(2, '0') + '-' +
       String(Date.now()).slice(-8);
 
-    const finalAddress = checkoutArea === 'global'
-      ? `${checkoutAddress} (Country: ${checkoutGlobalCountry}, City: ${checkoutGlobalCity} [Global Deliver])`
+    const selectedAreaObj = shippingAreas.find((a) => a.id === checkoutArea || a.name === checkoutArea);
+    const isGlobal = selectedAreaObj?.name?.toLowerCase().includes('global');
+    const finalAddress = isGlobal
+      ? `${checkoutAddress} (Country: ${checkoutGlobalCountry}, City: ${checkoutGlobalCity} [Global Delivery])`
       : checkoutAddress;
 
     const newOrder: Order = {
@@ -650,7 +729,7 @@ export default function App() {
       customerName: checkoutName,
       customerMobile: checkoutMobile,
       deliveryAddress: finalAddress,
-      shippingArea: checkoutArea,
+      shippingArea: selectedAreaObj ? selectedAreaObj.name : checkoutArea,
       shippingCharge,
       paymentMethod: 'Cash on Delivery',
       subtotal,
@@ -769,7 +848,156 @@ export default function App() {
           {/* --- VIEW 1: HOME PANEL --- */}
           {view === 'home' && (
             <div className="space-y-6">
-              {/* Promo Banner / Carousel */}
+              {selectedCategory ? (
+                /* --- DEDICATED CATEGORY LOOK (MATCHES USER SCREENSHOTS) --- */
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-6"
+                >
+                  {/* Category Info Header Banner block with back button and dresser icon */}
+                  <div className="bg-white border-b border-t border-slate-100 p-4 -mx-4 sm:-mx-6 flex items-center gap-3">
+                    <button
+                      onClick={() => setSelectedCategory(null)}
+                      className="p-2 rounded-full hover:bg-slate-50 transition-colors cursor-pointer text-slate-700 flex items-center justify-center focus:outline-none"
+                      id="btn-category-back"
+                      title="Back to home"
+                    >
+                      <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
+                    </button>
+
+                    {(() => {
+                      const activeCat = categories.find(c => c.name === selectedCategory);
+                      return activeCat?.image ? (
+                        <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center shrink-0">
+                          <img
+                            src={activeCat.image}
+                            alt={selectedCategory}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200/50 flex items-center justify-center shrink-0 shadow-sm justify-center">
+                          <CabinetIcon />
+                        </div>
+                      );
+                    })()}
+
+                    <div className="text-left">
+                      <h3 className="font-extrabold text-slate-800 text-base leading-none font-sans">
+                        {selectedCategory}
+                      </h3>
+                      <p className="text-xs text-slate-400 font-bold mt-1 font-sans">
+                        {products.filter(p => p.category === selectedCategory).length} Products
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Grid Layout of category products mirroring Image 2 */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {products
+                      .filter((p) => p.category === selectedCategory)
+                      .map((prod) => {
+                        const inWish = wishlist.includes(prod.id);
+                        return (
+                          <motion.div
+                            key={prod.id}
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-white rounded-2xl overflow-hidden border border-slate-100/70 shadow-sm hover:shadow-md transition-all relative flex flex-col justify-between"
+                          >
+                            {/* Product Image Cover block */}
+                            <div
+                              onClick={() => {
+                                setSelectedProductId(prod.id);
+                                setView('product_detail');
+                              }}
+                              className="h-32 sm:h-44 bg-slate-50 relative flex items-center justify-center overflow-hidden cursor-pointer group"
+                            >
+                              {prod.image === 'placeholder_box' ? (
+                                <div className="p-6 animate-pulse">
+                                  <BoxWithRays className="w-18 h-18 text-slate-400" />
+                                </div>
+                              ) : (
+                                <img
+                                  src={prod.image}
+                                  alt={prod.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 duration-300"
+                                  referrerPolicy="no-referrer"
+                                />
+                              )}
+                            </div>
+
+                            {/* Details and Actions block */}
+                            <div className="p-3.5 flex-1 flex flex-col justify-between space-y-3">
+                              <div
+                                onClick={() => {
+                                  setSelectedProductId(prod.id);
+                                  setView('product_detail');
+                                }}
+                                className="cursor-pointer space-y-0.5 block text-left"
+                              >
+                                <h4 className="font-extrabold text-slate-800 hover:text-green-700 tracking-tight font-sans text-xs sm:text-sm line-clamp-2 min-h-[32px] sm:min-h-[40px] leading-tight font-sans">
+                                  {prod.name}
+                                </h4>
+                              </div>
+
+                              {/* Price stack with optional strikeout */}
+                              <div className="flex items-center flex-wrap gap-2 text-left font-mono">
+                                <span className="text-[#c25927] font-black text-xs sm:text-sm">
+                                  {prod.price.toLocaleString()} AED
+                                </span>
+                                {prod.oldPrice && (
+                                  <span className="text-slate-400 font-bold line-through text-[10px] sm:text-xs">
+                                    {prod.oldPrice.toLocaleString()} AED
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Interactive actions identical to premium trending style */}
+                              <div className="space-y-1.5 pt-1">
+                                <div className="grid grid-cols-[1fr_auto] gap-1.5 font-sans">
+                                  <button
+                                    onClick={() => addToCart(prod.id, 1)}
+                                    className="flex items-center justify-center gap-1 border border-[#15803d]/40 text-[#15803d] rounded-xl text-[10px] sm:text-xs font-bold py-1.5 hover:bg-[#15803d]/5 active:scale-95 transition-all text-center cursor-pointer focus:outline-none"
+                                  >
+                                    <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Add to Cart</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => toggleWishlist(prod.id, e)}
+                                    className="p-1.5 sm:p-2 border border-slate-100 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer flex items-center justify-center focus:outline-none text-slate-400"
+                                  >
+                                    <Heart className={`w-3.5 h-3.5 shrink-0 ${inWish ? 'fill-red-500 text-red-500' : ''}`} />
+                                  </button>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    addToCart(prod.id, 1);
+                                    setView('checkout');
+                                  }}
+                                  className="w-full bg-[#15803d] hover:bg-[#15803d]/90 text-white rounded-xl text-[10px] sm:text-xs font-bold py-2 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm cursor-pointer focus:outline-none"
+                                >
+                                  <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+                                  <span>Buy Now</span>
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                  </div>
+
+                  {products.filter(p => p.category === selectedCategory).length === 0 && (
+                    <div className="py-12 text-center text-slate-400 text-sm font-sans bg-white border border-slate-100 rounded-2xl">
+                      No products found in this category.
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                <>
+                  {/* Promo Banner / Carousel */}
               <div className="relative rounded-2xl overflow-hidden h-44 sm:h-56 shadow-md border-r-4 border-[#c25927] flex items-center">
                 <img
                   src={slides[activeSlide].bg}
@@ -811,6 +1039,54 @@ export default function App() {
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
+                </div>
+              </div>
+
+
+              {/* --- EXPLORE CATEGORIES (Shop by Category) --- */}
+              <div className="space-y-4 py-2 select-none">
+                <div className="text-center space-y-2">
+                  <h3 className="font-extrabold text-[#15803d] text-base sm:text-lg tracking-tight font-sans">
+                    Choose Your Category
+                  </h3>
+                  
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => setCategoriesDrawerOpen(true)}
+                      className="bg-white border border-slate-200/80 hover:bg-slate-50 hover:border-slate-300 rounded-xl px-5 py-2 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer focus:outline-none"
+                    >
+                      <span>Explore Categories</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-4 py-2 font-sans overflow-x-auto scrollbar-none">
+                  {categories.map((cat) => {
+                    const isSelected = selectedCategory === cat.name;
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          setSelectedCategory(cat.name);
+                          const el = document.getElementById('section-all-products');
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth' });
+                          }
+                        }}
+                        className={`w-32 h-32 sm:w-36 sm:h-36 bg-white rounded-2xl border flex flex-col items-center justify-center p-4 transition-all duration-150 cursor-pointer shadow-sm focus:outline-none shrink-0 group ${
+                          isSelected
+                            ? 'border-[#15803d] scale-105 shadow-md ring-2 ring-[#15803d]/20'
+                            : 'border-slate-200 hover:border-[#15803d]/60 hover:shadow-md hover:scale-[1.02]'
+                        }`}
+                      >
+                        <CabinetIcon className="w-14 h-14" />
+                        <span className="text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight mt-3">
+                          {cat.name}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -866,9 +1142,6 @@ export default function App() {
                                   referrerPolicy="no-referrer"
                                 />
                               )}
-                              <span className="absolute bottom-2 left-2 text-[10px] bg-black/40 text-slate-100 uppercase px-2 py-0.5 rounded-md font-sans">
-                                {prod.category}
-                              </span>
                             </div>
 
                             {/* Info card details */}
@@ -883,19 +1156,16 @@ export default function App() {
                                 <h4 className="font-extrabold text-slate-800 hover:text-green-700 tracking-tight font-sans text-sm sm:text-base leading-tight line-clamp-1">
                                   {prod.name}
                                 </h4>
-                                <p className="text-[11px] text-slate-400 font-sans">
-                                  Handcrafted elite finish.
-                                </p>
                               </div>
 
                               {/* Price tier with comparison */}
                               <div className="flex items-center gap-2 text-left">
                                 <span className="text-[#c25927] font-black text-base sm:text-lg">
-                                  {prod.price.toLocaleString()}د.إ
+                                  {prod.price.toLocaleString()} AED
                                 </span>
                                 {prod.oldPrice && (
                                   <span className="text-slate-400 font-bold line-through text-xs">
-                                    {prod.oldPrice.toLocaleString()}د.إ
+                                    {prod.oldPrice.toLocaleString()} AED
                                   </span>
                                 )}
                               </div>
@@ -1007,9 +1277,6 @@ export default function App() {
                               referrerPolicy="no-referrer"
                             />
                           )}
-                          <span className="absolute bottom-2 left-2 text-[10px] bg-black/40 text-slate-100 uppercase px-2 py-0.5 rounded-md font-sans">
-                            {prod.category}
-                          </span>
                         </div>
 
                         {/* Content details block */}
@@ -1024,15 +1291,12 @@ export default function App() {
                             <h4 className="font-bold text-slate-800 tracking-tight hover:text-green-700 font-sans text-sm sm:text-base leading-tight">
                               {prod.name}
                             </h4>
-                            <p className="text-xs text-slate-400 line-clamp-1">
-                              Premium handcrafted modular setup.
-                            </p>
                           </div>
 
                           {/* Price & action stack */}
                           <div className="space-y-2 text-left">
                             <div className="text-[#c25927] font-extrabold text-base sm:text-lg">
-                              {prod.price.toLocaleString()}د.إ
+                              {prod.price.toLocaleString()} AED
                             </div>
 
                             <div className="grid grid-cols-2 gap-1.5">
@@ -1082,6 +1346,8 @@ export default function App() {
                   Track Order
                 </button>
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -1154,19 +1420,16 @@ export default function App() {
                           <h4 className="font-bold text-slate-800 hover:text-green-700 tracking-tight font-sans text-xs sm:text-sm line-clamp-2 min-h-[36px] leading-snug">
                             {prod.name}
                           </h4>
-                          <p className="text-[10px] text-slate-400 font-sans">
-                            Handcrafted elite finish.
-                          </p>
                         </div>
 
                         {/* Price centered with cross-out */}
                         <div className="flex justify-center items-center gap-1.5 flex-wrap">
                           <span className="text-[#c25927] font-extrabold text-xs sm:text-sm">
-                            {prod.price.toLocaleString()}د.إ
+                            {prod.price.toLocaleString()} AED
                           </span>
                           {prod.oldPrice && (
                             <span className="text-slate-400 font-semibold line-through text-[10px] sm:text-xs">
-                              {prod.oldPrice.toLocaleString()}د.إ
+                              {prod.oldPrice.toLocaleString()} AED
                             </span>
                           )}
                         </div>
@@ -1311,100 +1574,67 @@ export default function App() {
                   {/* Shipping Area Selector */}
                   <div className="space-y-1 text-xs">
                     <label className="font-bold text-slate-600 block mb-1">Shipping Area *</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <label
-                        className={`border rounded-xl p-3 flex flex-col justify-between cursor-pointer transition ${
-                          checkoutArea === 'inside'
-                            ? 'border-[#15803d] bg-emerald-50/20'
-                            : 'border-slate-200 bg-white hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center w-full mb-1">
-                          <span className="font-bold text-slate-800">Inside Dhaka</span>
-                          <input
-                            type="radio"
-                            name="shippingArea"
-                            checked={checkoutArea === 'inside'}
-                            onChange={() => setCheckoutArea('inside')}
-                            className="accent-[#15803d]"
-                          />
-                        </div>
-                        <span className="text-[10px] text-[#15803d] font-bold">Charge: 60د.إ</span>
-                        <span className="text-[10px] text-slate-400 font-sans mt-0.5">Estimated delivery time may vary</span>
-                      </label>
-
-                      <label
-                        className={`border rounded-xl p-3 flex flex-col justify-between cursor-pointer transition ${
-                          checkoutArea === 'outside'
-                            ? 'border-[#15803d] bg-[#15803d]/5'
-                            : 'border-slate-200 bg-white hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center w-full mb-1">
-                          <span className="font-bold text-slate-800">Outside Dhaka</span>
-                          <input
-                            type="radio"
-                            name="shippingArea"
-                            checked={checkoutArea === 'outside'}
-                            onChange={() => setCheckoutArea('outside')}
-                            className="accent-[#15803d]"
-                          />
-                        </div>
-                        <span className="text-[10px] text-[#15803d] font-bold">Charge: 120د.إ</span>
-                        <span className="text-[10px] text-slate-400 font-sans mt-0.5">Estimated delivery time may vary</span>
-                      </label>
-
-                      <label
-                        className={`border rounded-xl p-3 flex flex-col justify-between cursor-pointer transition ${
-                          checkoutArea === 'global'
-                            ? 'border-[#15803d] bg-blue-50/20'
-                            : 'border-slate-200 bg-white hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center w-full mb-1">
-                          <span className="font-bold text-slate-800">Global Delivery</span>
-                          <input
-                            type="radio"
-                            name="shippingArea"
-                            checked={checkoutArea === 'global'}
-                            onChange={() => setCheckoutArea('global')}
-                            className="accent-[#15803d]"
-                          />
-                        </div>
-                        <span className="text-[10px] text-[#15803d] font-bold">Charge: 350د.إ</span>
-                        <span className="text-[10px] text-slate-400 font-sans mt-0.5">Worldwide Express Delivery</span>
-                      </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                      {shippingAreas.map((area) => {
+                        const isSelected = checkoutArea === area.id || checkoutArea === area.name;
+                        return (
+                          <label
+                            key={area.id}
+                            className={`border rounded-xl p-3 flex flex-col justify-between cursor-pointer transition ${
+                              isSelected
+                                ? 'border-[#15803d] bg-emerald-50/20 shadow-sm'
+                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center w-full mb-1">
+                              <span className="font-bold text-slate-800">{area.name}</span>
+                              <input
+                                type="radio"
+                                name="shippingArea"
+                                checked={isSelected}
+                                onChange={() => setCheckoutArea(area.id)}
+                                className="accent-[#15803d]"
+                              />
+                            </div>
+                            <span className="text-[10px] text-[#15803d] font-bold">Charge: {area.charge} AED</span>
+                            <span className="text-[10px] text-slate-400 font-sans mt-0.5">Estimated delivery time may vary</span>
+                          </label>
+                        );
+                      })}
                     </div>
 
-                    {checkoutArea === 'global' && (
-                      <div className="mt-3 bg-blue-50/30 border border-blue-100 p-3 rounded-xl space-y-3 animation-fade-in">
-                        <span className="font-bold text-blue-800 text-[11px] block">Global Shipment Detail (Specify your country and city):</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-600 block mb-1">Country *</label>
-                            <input 
-                              type="text"
-                              required={checkoutArea === 'global'}
-                              placeholder="e.g. United Kingdom"
-                              value={checkoutGlobalCountry || ''}
-                              onChange={(e) => setCheckoutGlobalCountry(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded p-2 text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-600 block mb-1">City *</label>
-                            <input 
-                              type="text"
-                              required={checkoutArea === 'global'}
-                              placeholder="e.g. London"
-                              value={checkoutGlobalCity || ''}
-                              onChange={(e) => setCheckoutGlobalCity(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded p-2 text-xs"
-                            />
+                    {(() => {
+                      const selArea = shippingAreas.find(a => a.id === checkoutArea || a.name === checkoutArea);
+                      return selArea?.name?.toLowerCase().includes('global') && (
+                        <div className="mt-3 bg-blue-50/30 border border-blue-100 p-3 rounded-xl space-y-3 animation-fade-in">
+                          <span className="font-bold text-blue-800 text-[11px] block">Global Shipment Detail (Specify your country and city):</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">Country *</label>
+                              <input 
+                                type="text"
+                                required
+                                placeholder="e.g. United Kingdom"
+                                value={checkoutGlobalCountry || ''}
+                                onChange={(e) => setCheckoutGlobalCountry(e.target.value)}
+                                className="w-full bg-white border border-slate-200 rounded p-2 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">City *</label>
+                              <input 
+                                type="text"
+                                required
+                                placeholder="e.g. London"
+                                value={checkoutGlobalCity || ''}
+                                onChange={(e) => setCheckoutGlobalCity(e.target.value)}
+                                className="w-full bg-white border border-slate-200 rounded p-2 text-xs"
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1426,7 +1656,7 @@ export default function App() {
                             <span className="text-slate-600 truncate font-semibold">
                               {product.name} <span className="text-slate-400 font-sans">x {item.quantity}</span>
                             </span>
-                            <span className="font-bold text-slate-800">{(product.price * item.quantity).toLocaleString()}د.إ</span>
+                            <span className="font-bold text-slate-800">{(product.price * item.quantity).toLocaleString()} AED</span>
                           </div>
                         );
                       })}
@@ -1462,21 +1692,21 @@ export default function App() {
                         <div className="space-y-2 text-xs pt-3 border-t border-slate-50">
                           <div className="flex justify-between text-slate-600">
                             <span>Subtotal:</span>
-                            <span>{subtotal.toLocaleString()}د.إ</span>
+                            <span>{subtotal.toLocaleString()} AED</span>
                           </div>
                           {promoApplied && (
                             <div className="flex justify-between text-[#15803d] font-semibold">
                               <span>Promo Discount (10%):</span>
-                              <span>- {discount.toLocaleString()}د.إ</span>
+                              <span>- {discount.toLocaleString()} AED</span>
                             </div>
                           )}
                           <div className="flex justify-between text-slate-600">
                             <span>Delivery Charge:</span>
-                            <span>{shippingCharge.toLocaleString()}د.إ</span>
+                            <span>{shippingCharge.toLocaleString()} AED</span>
                           </div>
                           <div className="flex justify-between text-sm font-extrabold text-[#c25927] border-t border-slate-100 pt-2 font-sans">
                             <span>Total Payable Amount:</span>
-                            <span className="text-[#c25927]">{total.toLocaleString()}د.إ</span>
+                            <span className="text-[#c25927]">{total.toLocaleString()} AED</span>
                           </div>
                         </div>
                       );
@@ -1563,7 +1793,7 @@ export default function App() {
                 </div>
                 <div className="flex justify-between border-t border-slate-100 pt-2">
                   <span className="text-slate-400 font-bold">Order Total:</span>
-                  <span className="text-[#c25927] font-extrabold text-sm">{latestPlacedOrder.total.toLocaleString()}د.إ</span>
+                  <span className="text-[#c25927] font-extrabold text-sm">{latestPlacedOrder.total.toLocaleString()} AED</span>
                 </div>
               </div>
 
@@ -2131,8 +2361,8 @@ export default function App() {
                           </span>
                           <div>
                             <p className="text-[10px] uppercase font-bold text-slate-400">Total Spent</p>
-                            <p className="text-core font-extrabold text-slate-800">
-                              {orders.filter((o) => o.customerMobile === user.phone).reduce((sum, o) => sum + o.total, 0).toLocaleString()}د.إ
+                            <p className="text-core font-extrabold text-[#c25927]">
+                              {orders.filter((o) => o.customerMobile === user.phone).reduce((sum, o) => sum + o.total, 0).toLocaleString()} AED
                             </p>
                           </div>
                         </div>
@@ -2375,7 +2605,7 @@ export default function App() {
                               </p>
                               <p className="text-slate-600">
                                 <span className="font-bold text-slate-700">Shipping Zone: </span>
-                                {ord.shippingArea === 'inside' ? 'Inside Dubai / UAE' : ord.shippingArea === 'outside' ? 'Other Emirates / Gulf' : 'Global Delivery'} ({ord.shippingCharge}د.إ)
+                                {ord.shippingArea} ({ord.shippingCharge} AED)
                               </p>
                             </div>
 
@@ -2393,10 +2623,10 @@ export default function App() {
                                       )}
                                       <div>
                                         <p className="font-bold text-slate-800">{product.name}</p>
-                                        <p className="text-[10px] text-slate-400 font-sans">Qty: {quantity} x {product.price}د.إ</p>
+                                        <p className="text-[10px] text-slate-400 font-sans">Qty: {quantity} x {product.price} AED</p>
                                       </div>
                                     </div>
-                                    <span className="font-black text-slate-700">{(product.price * quantity).toLocaleString()}د.إ</span>
+                                    <span className="font-black text-slate-700">{(product.price * quantity).toLocaleString()} AED</span>
                                   </div>
                                 ))}
                               </div>
@@ -2404,7 +2634,7 @@ export default function App() {
 
                             <div className="border-t border-slate-100 pt-3 flex justify-between font-extrabold text-[#c25927] text-sm">
                               <span>Grand Total (payable):</span>
-                              <span>{ord.total.toLocaleString()}د.إ</span>
+                              <span>{ord.total.toLocaleString()} AED</span>
                             </div>
 
                             <div className="flex gap-2 pt-2">
@@ -2460,7 +2690,7 @@ export default function App() {
                                   )}
                                   <div>
                                     <p className="font-bold text-slate-800">{prod.name}</p>
-                                    <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()}د.إ</p>
+                                    <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()} AED</p>
                                   </div>
                                 </div>
 
@@ -2735,7 +2965,7 @@ export default function App() {
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()}د.إ</p>
+                          <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()} AED</p>
 
                           {/* Plus minus counter */}
                           <div className="flex items-center gap-2 pt-0.5">
@@ -2767,7 +2997,7 @@ export default function App() {
                   return (
                     <div className="flex justify-between text-xs font-bold text-slate-800">
                       <span>Subtotal:</span>
-                      <span className="text-[#c25927]">{subtotal.toLocaleString()}د.إ</span>
+                      <span className="text-[#c25927]">{subtotal.toLocaleString()} AED</span>
                     </div>
                   );
                 })()}
@@ -3056,7 +3286,7 @@ export default function App() {
                               )}
                               <div className="text-left flex-1">
                                 <p className="font-bold text-slate-850">{prod.name}</p>
-                                <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()}د.إ</p>
+                                <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()} AED</p>
                               </div>
                               <ChevronRight className="w-4 h-4 text-slate-400" />
                             </div>
