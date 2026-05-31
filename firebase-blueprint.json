@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "E-commerce product entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "oldPrice": { "type": "number" },
+        "image": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "specs": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviews": { "type": "number" },
+        "isTrending": { "type": "boolean" },
+        "stock": { "type": "number" }
+      },
+      "required": ["id", "name", "price", "image", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerMobile": { "type": "string" },
+        "deliveryAddress": { "type": "string" },
+        "shippingArea": { "type": "string" },
+        "shippingCharge": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "total": { "type": "number" },
+        "status": { "type": "string" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "products": { "type": "array" }
+      },
+      "required": ["id", "orderNumber", "customerName", "customerMobile", "deliveryAddress", "total", "status"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Product categories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "image": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Slide": {
+      "title": "Slide",
+      "description": "Carousel promo banners",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "bg": { "type": "string" }
+      },
+      "required": ["id", "title", "bg"]
+    },
+    "ShippingArea": {
+      "title": "ShippingArea",
+      "description": "Shipping regions and charges",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "charge": { "type": "number" }
+      },
+      "required": ["id", "name", "charge"]
+    },
+    "User": {
+      "title": "User",
+      "description": "System registered users",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" }
+      },
+      "required": ["name", "email"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "All furniture products collection"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Placed orders tracking collection"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Available categories list"
+    },
+    "/slides/{slideId}": {
+      "schema": "Slide",
+      "description": "Carousel slides for home screen"
+    },
+    "/shipping_areas/{areaId}": {
+      "schema": "ShippingArea",
+      "description": "Supported shipping areas and rates"
+    },
+    "/users/{phone}": {
+      "schema": "User",
+      "description": "System users mapped by mobile number"
+    }
+  }
+}

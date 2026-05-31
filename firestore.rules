@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global catch-all default-deny gate
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Public products catalogue access
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Public categories access
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Slider screens
+    match /slides/{slideId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Shipping tiers and rates
+    match /shipping_areas/{areaId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Real-time globally placed orders
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // System accounts mapping by phone numbers
+    match /users/{phone} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -384,6 +384,7 @@ export default function App() {
     if (tab === 'home') {
       setView('home');
       setSelectedProductId(null);
+      setSelectedCategory(null);
     } else if (tab === 'cart') {
       setCartDrawerOpen(true);
     } else if (tab === 'profile') {
@@ -840,6 +841,7 @@ export default function App() {
           onLogoClick={() => {
             setView('home');
             setSelectedProductId(null);
+            setSelectedCategory(null);
           }}
         />
 
@@ -853,7 +855,7 @@ export default function App() {
                 <motion.div
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="space-y-6"
+                  className="space-y-6 -mt-5"
                 >
                   {/* Category Info Header Banner block with back button and dresser icon */}
                   <div className="bg-white border-b border-t border-slate-100 p-4 -mx-4 sm:-mx-6 flex items-center gap-3">
@@ -998,108 +1000,57 @@ export default function App() {
               ) : (
                 <>
                   {/* Promo Banner / Carousel */}
-              <div className="relative rounded-2xl overflow-hidden h-44 sm:h-56 shadow-md border-r-4 border-[#c25927] flex items-center">
-                <img
-                  src={slides[activeSlide].bg}
-                  alt="Banner"
-                  className="absolute inset-0 w-full h-full object-cover brightness-[0.4]"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="relative z-10 p-6 text-white max-w-sm space-y-1.5">
-                  <h2 className="font-extrabold text-xl sm:text-2xl leading-none text-orange-100 font-sans tracking-tight">
-                    {slides[activeSlide].title}
-                  </h2>
-                  <p className="text-[11px] sm:text-xs text-slate-200">
-                    {slides[activeSlide].subtitle}
-                  </p>
-                  <button
-                    onClick={() => {
-                      setSelectedCategory(null);
-                      const el = document.getElementById('section-trending-products') || document.getElementById('section-all-products');
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth' });
-                      }
-                    }}
-                    className="mt-2 text-[10px] bg-[#c25927] hover:bg-[#b04d20] cursor-pointer font-bold px-3 py-1 rounded transition text-white"
-                  >
-                    Browse Collections
-                  </button>
-                </div>
-                {/* Arrow selectors */}
-                <div className="absolute right-4 bottom-4 flex gap-1 z-20">
-                  <button
-                    onClick={() => setActiveSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1))}
-                    className="p-1 rounded bg-black/40 text-white/80 hover:text-white"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setActiveSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))}
-                    className="p-1 rounded bg-black/40 text-white/80 hover:text-white"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-
-              {/* --- EXPLORE CATEGORIES (Shop by Category) --- */}
-              <div className="space-y-4 py-2 select-none">
-                <div className="text-center space-y-2">
-                  <h3 className="font-extrabold text-[#15803d] text-base sm:text-lg tracking-tight font-sans">
-                    Choose Your Category
-                  </h3>
-                  
-                  <div className="flex justify-center">
-                    <button
-                      onClick={() => setCategoriesDrawerOpen(true)}
-                      className="bg-white border border-slate-200/80 hover:bg-slate-50 hover:border-slate-300 rounded-xl px-5 py-2 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer focus:outline-none"
-                    >
-                      <span>Explore Categories</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-4 py-2 font-sans overflow-x-auto scrollbar-none">
-                  {categories.map((cat) => {
-                    const isSelected = selectedCategory === cat.name;
+                  {(() => {
+                    const currentSlide = slides[activeSlide] || slides[0];
+                    if (!currentSlide) return null;
                     return (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setSelectedCategory(cat.name);
-                          const el = document.getElementById('section-all-products');
-                          if (el) {
-                            el.scrollIntoView({ behavior: 'smooth' });
-                          }
-                        }}
-                        className={`w-[110px] h-[110px] sm:w-[124px] sm:h-[124px] bg-white rounded-xl border flex flex-col items-center justify-center p-3 transition-all duration-150 cursor-pointer shadow-sm focus:outline-none shrink-0 group ${
-                          isSelected
-                            ? 'border-[#15803d] ring-2 ring-[#15803d]/15 bg-emerald-50/10'
-                            : 'border-slate-200/80 hover:border-[#15803d]/60 hover:shadow-md hover:scale-[1.01]'
-                        }`}
-                      >
-                        <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 overflow-hidden">
-                          {cat.image ? (
-                            <img
-                              src={cat.image}
-                              alt={cat.name}
-                              className="max-w-full max-h-full object-contain rounded-lg"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <CabinetIcon className="w-10 h-10" />
-                          )}
+                      <div className="relative rounded-2xl overflow-hidden h-44 sm:h-56 shadow-md border-r-4 border-[#c25927] flex items-center">
+                        <img
+                          src={currentSlide.bg}
+                          alt="Banner"
+                          className="absolute inset-0 w-full h-full object-cover brightness-[0.4]"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="relative z-10 p-6 text-white max-w-sm space-y-1.5">
+                          <h2 className="font-extrabold text-xl sm:text-2xl leading-none text-orange-100 font-sans tracking-tight">
+                            {currentSlide.title}
+                          </h2>
+                          <p className="text-[11px] sm:text-xs text-slate-200">
+                            {currentSlide.subtitle}
+                          </p>
+                          <button
+                            onClick={() => {
+                              setSelectedCategory(null);
+                              const el = document.getElementById('section-trending-products') || document.getElementById('section-all-products');
+                              if (el) {
+                                el.scrollIntoView({ behavior: 'smooth' });
+                              }
+                            }}
+                            className="mt-2 text-[10px] bg-[#c25927] hover:bg-[#b04d20] cursor-pointer font-bold px-3 py-1 rounded transition text-white"
+                          >
+                            Browse Collections
+                          </button>
                         </div>
-                        <span className="text-xs sm:text-sm font-semibold text-slate-800 tracking-tight mt-2 select-none group-hover:text-[#15803d] transition-colors">
-                          {cat.name}
-                        </span>
-                      </button>
+                        {/* Arrow selectors */}
+                        {slides.length > 1 && (
+                          <div className="absolute right-4 bottom-4 flex gap-1 z-20">
+                            <button
+                              onClick={() => setActiveSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1))}
+                              className="p-1 rounded bg-black/40 text-white/80 hover:text-white"
+                            >
+                              <ArrowLeft className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setActiveSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))}
+                              className="p-1 rounded bg-black/40 text-white/80 hover:text-white"
+                            >
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     );
-                  })}
-                </div>
-              </div>
+                  })()}
 
 
               {/* --- 1. TRENDING PRODUCTS --- */}

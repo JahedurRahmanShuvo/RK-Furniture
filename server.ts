@@ -19,7 +19,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Firebase credentials matching client config to integrate persistent Firestore db
-const firebaseConfig = {
+const defaultFirebaseConfig = {
   apiKey: "AIzaSyDfuSipIqlV69-bzFg24F52DLf6GR7PYwQ",
   authDomain: "rk-furniture-e0b7e.firebaseapp.com",
   projectId: "rk-furniture-e0b7e",
@@ -29,8 +29,21 @@ const firebaseConfig = {
   measurementId: "G-7V079KPE44"
 };
 
+const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+let firebaseConfig: any = defaultFirebaseConfig;
+if (fs.existsSync(configPath)) {
+  try {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    console.log('[Firebase config loaded from platform]', firebaseConfig.projectId);
+  } catch (error) {
+    console.error('Failed to parse firebase-applet-config.json:', error);
+  }
+}
+
 const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
+const db = firebaseConfig.firestoreDatabaseId 
+  ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(firebaseApp);
 
 // JSON Local Persistence DB Paths
 const PRODUCTS_DB_PATH = path.join(process.cwd(), 'db_products.json');
