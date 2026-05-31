@@ -1074,14 +1074,25 @@ export default function App() {
                             el.scrollIntoView({ behavior: 'smooth' });
                           }
                         }}
-                        className={`w-32 h-32 sm:w-36 sm:h-36 bg-white rounded-2xl border flex flex-col items-center justify-center p-4 transition-all duration-150 cursor-pointer shadow-sm focus:outline-none shrink-0 group ${
+                        className={`w-[110px] h-[110px] sm:w-[124px] sm:h-[124px] bg-white rounded-xl border flex flex-col items-center justify-center p-3 transition-all duration-150 cursor-pointer shadow-sm focus:outline-none shrink-0 group ${
                           isSelected
-                            ? 'border-[#15803d] scale-105 shadow-md ring-2 ring-[#15803d]/20'
-                            : 'border-slate-200 hover:border-[#15803d]/60 hover:shadow-md hover:scale-[1.02]'
+                            ? 'border-[#15803d] ring-2 ring-[#15803d]/15 bg-emerald-50/10'
+                            : 'border-slate-200/80 hover:border-[#15803d]/60 hover:shadow-md hover:scale-[1.01]'
                         }`}
                       >
-                        <CabinetIcon className="w-14 h-14" />
-                        <span className="text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight mt-3">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 overflow-hidden">
+                          {cat.image ? (
+                            <img
+                              src={cat.image}
+                              alt={cat.name}
+                              className="max-w-full max-h-full object-contain rounded-lg"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <CabinetIcon className="w-10 h-10" />
+                          )}
+                        </div>
+                        <span className="text-xs sm:text-sm font-semibold text-slate-800 tracking-tight mt-2 select-none group-hover:text-[#15803d] transition-colors">
                           {cat.name}
                         </span>
                       </button>

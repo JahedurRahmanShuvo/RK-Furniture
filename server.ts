@@ -2,12 +2,35 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  getDocs, 
+  setDoc, 
+  doc, 
+  deleteDoc 
+} from 'firebase/firestore';
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Firebase credentials matching client config to integrate persistent Firestore db
+const firebaseConfig = {
+  apiKey: "AIzaSyDfuSipIqlV69-bzFg24F52DLf6GR7PYwQ",
+  authDomain: "rk-furniture-e0b7e.firebaseapp.com",
+  projectId: "rk-furniture-e0b7e",
+  storageBucket: "rk-furniture-e0b7e.firebasestorage.app",
+  messagingSenderId: "396188287069",
+  appId: "1:396188287069:web:bb1150bb693cd6b72c8db4",
+  measurementId: "G-7V079KPE44"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
 // JSON Local Persistence DB Paths
 const PRODUCTS_DB_PATH = path.join(process.cwd(), 'db_products.json');
@@ -58,7 +81,109 @@ setInterval(() => {
   }
 }, 10000);
 
-// Initialize DBs with Admin if missing
+// Generic function to load collection from Cloud Firestore with local sync and default fallback
+async function loadCollectionFromFirestore<T>(collectionName: string, localFilePath: string, defaultValue: T[]): Promise<T[]> {
+  try {
+    const colRef = collection(db, collectionName);
+    const snapshot = await getDocs(colRef);
+    if (!snapshot.empty) {
+      const items: T[] = [];
+      snapshot.forEach((d) => {
+        items.push(d.data() as T);
+      });
+      
+      // Ensure collections stay sorted
+      if (collectionName === 'orders') {
+        (items as any[]).sort((a, b) => {
+          const idA = String(a.id || '');
+          const idB = String(b.id || '');
+          return idB.localeCompare(idA);
+        });
+      } else if (collectionName === 'products') {
+        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      } else if (collectionName === 'categories') {
+        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      } else if (collectionName === 'shipping_areas') {
+        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      } else if (collectionName === 'slides') {
+        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      }
+
+      // Refresh local JSON cache
+      writeJSONFile(localFilePath, items);
+      return items;
+    } else {
+      // If Firestore is empty, seed from local JSON
+      const localData = readJSONFile(localFilePath, defaultValue);
+      if (Array.isArray(localData) && localData.length > 0) {
+        console.log(`[Firestore Seed] Seeding collection: ${collectionName} with ${localData.length} records`);
+        for (const item of localData) {
+          const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || Math.random());
+          await setDoc(doc(db, collectionName, docId), item);
+        }
+      }
+      return localData;
+    }
+  } catch (error) {
+    console.error(`[Firestore Sync Warning] Failed to fetch collection ${collectionName}:`, error);
+    return readJSONFile(localFilePath, defaultValue);
+  }
+}
+
+// Save or edit a doc in Firestore
+async function saveDocToFirestore(collectionName: string, docId: string, data: any) {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await setDoc(docRef, data);
+  } catch (error) {
+    console.error(`[Firestore Sync Error] Failed to write document ${docId} in ${collectionName}:`, error);
+  }
+}
+
+// Delete a doc from Firestore
+async function deleteDocFromFirestore(collectionName: string, docId: string) {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error(`[Firestore Sync Error] Failed to delete document ${docId} from ${collectionName}:`, error);
+  }
+}
+
+// Sync users collection
+async function loadUsersFromFirestore(): Promise<{ [key: string]: any }> {
+  try {
+    const colRef = collection(db, 'users');
+    const snapshot = await getDocs(colRef);
+    const usersObj: { [key: string]: any } = {};
+    if (!snapshot.empty) {
+      snapshot.forEach((d) => {
+        usersObj[d.id] = d.data();
+      });
+      writeJSONFile(USERS_DB_PATH, usersObj);
+      return usersObj;
+    } else {
+      const localUsers = readJSONFile(USERS_DB_PATH, {});
+      for (const phone in localUsers) {
+        await setDoc(doc(db, 'users', phone), localUsers[phone]);
+      }
+      return localUsers;
+    }
+  } catch (error) {
+    console.error(`[Firestore Sync Warning] Failed to load users:`, error);
+    return readJSONFile(USERS_DB_PATH, {});
+  }
+}
+
+async function saveUserToFirestore(phone: string, userObj: any) {
+  try {
+    await setDoc(doc(db, 'users', phone), userObj);
+  } catch (error) {
+    console.error(`[Firestore Sync Error] Failed to write user userObj:`, error);
+  }
+}
+
+// Initialize local DBs with Admin if missing & seed Firestore Auth user mapping
 const usersDB = readJSONFile(USERS_DB_PATH, {});
 if (!usersDB['01700000000']) {
   usersDB['01700000000'] = {
@@ -68,6 +193,9 @@ if (!usersDB['01700000000']) {
   };
   writeJSONFile(USERS_DB_PATH, usersDB);
 }
+// Seed admin to firestore
+saveUserToFirestore('01700000000', usersDB['01700000000']).catch(() => {});
+
 
 // Initial Data structures matching front-end data
 const INITIAL_PRODUCTS = [
@@ -217,48 +345,52 @@ try {
 // -------------------------------------------------------------
 
 // 1. PRODUCTS ENDPOINTS
-app.get('/api/products', (req, res) => {
-  const products = readJSONFile(PRODUCTS_DB_PATH, INITIAL_PRODUCTS);
+app.get('/api/products', async (req, res) => {
+  const products = await loadCollectionFromFirestore('products', PRODUCTS_DB_PATH, INITIAL_PRODUCTS);
   res.json(products);
 });
 
-app.post('/api/products', (req, res) => {
-  const products = readJSONFile(PRODUCTS_DB_PATH, INITIAL_PRODUCTS);
+app.post('/api/products', async (req, res) => {
+  const products = await loadCollectionFromFirestore('products', PRODUCTS_DB_PATH, INITIAL_PRODUCTS);
   const newProduct = req.body;
   if (!newProduct.id) {
     newProduct.id = 'product_' + Date.now();
   }
   products.push(newProduct);
   writeJSONFile(PRODUCTS_DB_PATH, products);
+  await saveDocToFirestore('products', newProduct.id, newProduct);
   res.status(201).json(newProduct);
 });
 
-app.delete('/api/products/:id', (req, res) => {
+app.delete('/api/products/:id', async (req, res) => {
   const { id } = req.params;
-  let products = readJSONFile(PRODUCTS_DB_PATH, INITIAL_PRODUCTS);
+  let products = await loadCollectionFromFirestore('products', PRODUCTS_DB_PATH, INITIAL_PRODUCTS);
   products = products.filter((p: any) => p.id !== id);
   writeJSONFile(PRODUCTS_DB_PATH, products);
+  await deleteDocFromFirestore('products', id);
   res.json({ success: true, message: 'Product deleted' });
 });
 
 // 2. ORDERS ENDPOINTS
-app.get('/api/orders', (req, res) => {
-  const orders = readJSONFile(ORDERS_DB_PATH, INITIAL_ORDERS);
+app.get('/api/orders', async (req, res) => {
+  const orders = await loadCollectionFromFirestore('orders', ORDERS_DB_PATH, INITIAL_ORDERS);
   res.json(orders);
 });
 
-app.post('/api/orders', (req, res) => {
-  const orders = readJSONFile(ORDERS_DB_PATH, INITIAL_ORDERS);
+app.post('/api/orders', async (req, res) => {
+  const orders = await loadCollectionFromFirestore('orders', ORDERS_DB_PATH, INITIAL_ORDERS);
   const newOrder = req.body;
+  const orderId = String(newOrder.id || 'order_' + Date.now());
   orders.unshift(newOrder); // Add to beginning
   writeJSONFile(ORDERS_DB_PATH, orders);
+  await saveDocToFirestore('orders', orderId, newOrder);
   res.status(201).json(newOrder);
 });
 
-app.put('/api/orders/:id', (req, res) => {
+app.put('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
   const { status, customerName, customerMobile, deliveryAddress, note, total, shippingArea } = req.body;
-  const orders = readJSONFile(ORDERS_DB_PATH, INITIAL_ORDERS);
+  const orders = await loadCollectionFromFirestore('orders', ORDERS_DB_PATH, INITIAL_ORDERS);
   const orderIndex = orders.findIndex((o: any) => o.id === id);
   if (orderIndex !== -1) {
     if (status !== undefined) orders[orderIndex].status = status;
@@ -269,29 +401,32 @@ app.put('/api/orders/:id', (req, res) => {
     if (total !== undefined) orders[orderIndex].total = total;
     if (shippingArea !== undefined) orders[orderIndex].shippingArea = shippingArea;
     writeJSONFile(ORDERS_DB_PATH, orders);
+    await saveDocToFirestore('orders', id, orders[orderIndex]);
     res.json(orders[orderIndex]);
   } else {
     res.status(404).json({ error: 'Order not found' });
   }
 });
 
-app.delete('/api/orders/:id', (req, res) => {
+app.delete('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
-  let orders = readJSONFile(ORDERS_DB_PATH, INITIAL_ORDERS);
+  let orders = await loadCollectionFromFirestore('orders', ORDERS_DB_PATH, INITIAL_ORDERS);
   orders = orders.filter((o: any) => o.id !== id);
   writeJSONFile(ORDERS_DB_PATH, orders);
+  await deleteDocFromFirestore('orders', id);
   res.json({ success: true, message: 'Order deleted successfully' });
 });
 
 // Update/Edit Product (For Admin)
-app.put('/api/products/:id', (req, res) => {
+app.put('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   const updatedData = req.body;
-  const products = readJSONFile(PRODUCTS_DB_PATH, INITIAL_PRODUCTS);
+  const products = await loadCollectionFromFirestore('products', PRODUCTS_DB_PATH, INITIAL_PRODUCTS);
   const prodIndex = products.findIndex((p: any) => p.id === id);
   if (prodIndex !== -1) {
     products[prodIndex] = { ...products[prodIndex], ...updatedData };
     writeJSONFile(PRODUCTS_DB_PATH, products);
+    await saveDocToFirestore('products', id, products[prodIndex]);
     res.json(products[prodIndex]);
   } else {
     res.status(404).json({ error: 'Product not found' });
@@ -299,32 +434,47 @@ app.put('/api/products/:id', (req, res) => {
 });
 
 // 3. USERS ENDPOINTS (For system registrations database)
-app.get('/api/users', (req, res) => {
-  const users = readJSONFile(USERS_DB_PATH, {});
+app.get('/api/users', async (req, res) => {
+  const users = await loadUsersFromFirestore();
   res.json(users);
 });
 
-app.post('/api/users', (req, res) => {
-  const users = readJSONFile(USERS_DB_PATH, {});
+app.post('/api/users', async (req, res) => {
   const { phone, userObj } = req.body;
   if (!phone || !userObj) {
     return res.status(400).json({ error: 'Missing phone or userObj' });
   }
+  const users = await loadUsersFromFirestore();
   users[phone] = userObj;
   writeJSONFile(USERS_DB_PATH, users);
+  await saveUserToFirestore(phone, userObj);
   res.status(200).json({ success: true, user: userObj });
 });
 
 // SLIDES ENDPOINTS
-app.get('/api/slides', (req, res) => {
-  const slides = readJSONFile(SLIDES_DB_PATH, INITIAL_SLIDES);
+app.get('/api/slides', async (req, res) => {
+  const slides = await loadCollectionFromFirestore('slides', SLIDES_DB_PATH, INITIAL_SLIDES);
   res.json(slides);
 });
 
-app.post('/api/slides', (req, res) => {
+app.post('/api/slides', async (req, res) => {
   const slides = req.body;
   if (Array.isArray(slides)) {
     writeJSONFile(SLIDES_DB_PATH, slides);
+    for (const slide of slides) {
+      if (slide.id) {
+        await saveDocToFirestore('slides', slide.id, slide);
+      }
+    }
+    // Cleanup deleted slides from Firestore in background
+    try {
+      const dbSlides = await loadCollectionFromFirestore('slides', SLIDES_DB_PATH, INITIAL_SLIDES);
+      for (const dS of dbSlides) {
+        if (!slides.some((s: any) => s.id === dS.id)) {
+          await deleteDocFromFirestore('slides', dS.id);
+        }
+      }
+    } catch (_) {}
     res.json({ success: true, slides });
   } else {
     res.status(400).json({ error: 'Must be an array' });
@@ -332,13 +482,13 @@ app.post('/api/slides', (req, res) => {
 });
 
 // CATEGORIES ENDPOINTS
-app.get('/api/categories', (req, res) => {
-  const categories = readJSONFile(CATEGORIES_DB_PATH, INITIAL_CATEGORIES);
+app.get('/api/categories', async (req, res) => {
+  const categories = await loadCollectionFromFirestore('categories', CATEGORIES_DB_PATH, INITIAL_CATEGORIES);
   res.json(categories);
 });
 
-app.post('/api/categories', (req, res) => {
-  const categories = readJSONFile(CATEGORIES_DB_PATH, INITIAL_CATEGORIES);
+app.post('/api/categories', async (req, res) => {
+  const categories = await loadCollectionFromFirestore('categories', CATEGORIES_DB_PATH, INITIAL_CATEGORIES);
   const newCat = req.body;
   if (!newCat.id) {
     newCat.id = 'category_' + Date.now();
@@ -350,25 +500,27 @@ app.post('/api/categories', (req, res) => {
     categories.push(newCat);
   }
   writeJSONFile(CATEGORIES_DB_PATH, categories);
+  await saveDocToFirestore('categories', newCat.id, newCat);
   res.status(201).json(newCat);
 });
 
-app.delete('/api/categories/:id', (req, res) => {
+app.delete('/api/categories/:id', async (req, res) => {
   const { id } = req.params;
-  let categories = readJSONFile(CATEGORIES_DB_PATH, INITIAL_CATEGORIES);
+  let categories = await loadCollectionFromFirestore('categories', CATEGORIES_DB_PATH, INITIAL_CATEGORIES);
   categories = categories.filter((c: any) => c.id !== id);
   writeJSONFile(CATEGORIES_DB_PATH, categories);
+  await deleteDocFromFirestore('categories', id);
   res.json({ success: true, message: 'Category deleted' });
 });
 
 // SHIPPING AREAS ENDPOINTS
-app.get('/api/shipping-areas', (req, res) => {
-  const areas = readJSONFile(SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
+app.get('/api/shipping-areas', async (req, res) => {
+  const areas = await loadCollectionFromFirestore('shipping_areas', SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
   res.json(areas);
 });
 
-app.post('/api/shipping-areas', (req, res) => {
-  const areas = readJSONFile(SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
+app.post('/api/shipping-areas', async (req, res) => {
+  const areas = await loadCollectionFromFirestore('shipping_areas', SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
   const newArea = req.body;
   if (!newArea.id) {
     newArea.id = 'ship_' + Date.now();
@@ -381,14 +533,16 @@ app.post('/api/shipping-areas', (req, res) => {
     areas.push(newArea);
   }
   writeJSONFile(SHIPPING_AREAS_DB_PATH, areas);
+  await saveDocToFirestore('shipping_areas', newArea.id, newArea);
   res.status(201).json(newArea);
 });
 
-app.delete('/api/shipping-areas/:id', (req, res) => {
+app.delete('/api/shipping-areas/:id', async (req, res) => {
   const { id } = req.params;
-  let areas = readJSONFile(SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
+  let areas = await loadCollectionFromFirestore('shipping_areas', SHIPPING_AREAS_DB_PATH, INITIAL_SHIPPING_AREAS);
   areas = areas.filter((a: any) => a.id !== id);
   writeJSONFile(SHIPPING_AREAS_DB_PATH, areas);
+  await deleteDocFromFirestore('shipping_areas', id);
   res.json({ success: true, message: 'Shipping area deleted' });
 });
 
