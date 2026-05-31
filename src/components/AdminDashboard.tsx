@@ -204,6 +204,10 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     }
   }, [toast]);
 
+  useEffect(() => {
+    setProducts(allProducts);
+  }, [allProducts]);
+
   // Update order status trigger
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
     fetch(`/api/orders/${orderId}`, {
@@ -269,7 +273,11 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   // Add Product Submit
   const handleAddNewProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanImg = prodImage || 'https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=600&q=80';
+    if (!prodImage) {
+      showToast('অনুগ্রহ করে প্রোডাক্টের জন্য একটি ফটো আপলোড করুন!', 'error');
+      return;
+    }
+    const cleanImg = prodImage;
     const newProd = {
       name: prodName,
       price: prodPrice,
@@ -404,11 +412,15 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       showToast('Please enter a Category Name!', 'error');
       return;
     }
+    if (!catImage) {
+      showToast('অনুগ্রহ করে ক্যাটাগরি কভার ছবি আপলোড করুন!', 'error');
+      return;
+    }
     const slug = catName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
     const newCat = {
       id: slug || 'cat_' + Date.now(),
       name: catName,
-      image: catImage || 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80'
+      image: catImage
     };
 
     fetch('/api/categories', {
@@ -1542,7 +1554,6 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                           accept="image/*"
                           id="slide-bg-upload"
                           className="hidden"
-                          required={isAddingSlide && !slideBg}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
@@ -1695,7 +1706,6 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                           accept="image/*"
                           id="category-img-upload"
                           className="hidden"
-                          required
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
@@ -2042,7 +2052,6 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     accept="image/*" 
                     id="mobile-product-file"
                     className="hidden"
-                    required={!editingProduct && !prodImage}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
