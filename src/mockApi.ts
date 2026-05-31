@@ -195,6 +195,12 @@ async function getFirestoreCollection<T>(collectionName: string, defaultValue: T
   try {
     const colRef = collection(db, collectionName);
     const snapshot = await getDocs(colRef);
+    
+    // Check if system has been seeded before
+    const seedRef = doc(db, 'system_meta', 'seed_status');
+    const seedSnap = await getDoc(seedRef);
+    const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
+
     if (!snapshot.empty) {
       const items: T[] = [];
       snapshot.forEach((d) => {
@@ -212,12 +218,17 @@ async function getFirestoreCollection<T>(collectionName: string, defaultValue: T
       }
       return items;
     } else {
-      // Seed Firestore with default value
-      for (const item of defaultValue) {
-        const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
-        await setDoc(doc(db, collectionName, docId), item);
+      // Seed Firestore with default value only if the DB has NEVER been seeded before
+      if (!isSeeded && defaultValue.length > 0) {
+        for (const item of defaultValue) {
+          const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
+          await setDoc(doc(db, collectionName, docId), item);
+        }
+        await setDoc(seedRef, { seeded: true });
+        return defaultValue;
       }
-      return defaultValue;
+      // If already seeded, returning empty list is correct (meaning the user cleared the collection)
+      return [];
     }
   } catch (err) {
     console.warn(`[Firestore sync fallback] Failed for ${collectionName}:`, err);
@@ -234,6 +245,11 @@ async function getFirestoreUsers(): Promise<{ [key: string]: any }> {
   try {
     const colRef = collection(db, 'users');
     const snapshot = await getDocs(colRef);
+    
+    const seedRef = doc(db, 'system_meta', 'seed_status');
+    const seedSnap = await getDoc(seedRef);
+    const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
+
     const usersObj: { [key: string]: any } = {};
     if (!snapshot.empty) {
       snapshot.forEach((d) => {
@@ -241,10 +257,14 @@ async function getFirestoreUsers(): Promise<{ [key: string]: any }> {
       });
       return usersObj;
     } else {
-      for (const phone in DEFAULT_USERS) {
-        await setDoc(doc(db, 'users', phone), (DEFAULT_USERS as any)[phone]);
+      if (!isSeeded) {
+        for (const phone in DEFAULT_USERS) {
+          await setDoc(doc(db, 'users', phone), (DEFAULT_USERS as any)[phone]);
+        }
+        await setDoc(seedRef, { seeded: true });
+        return DEFAULT_USERS;
       }
-      return DEFAULT_USERS;
+      return {};
     }
   } catch (err) {
     console.warn(`[Firestore users sync error]`, err);

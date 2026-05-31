@@ -12,6 +12,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Seeding metadata
+    match /system_meta/{metaId} {
+      allow read, write: if true;
+    }
+
     // Public categories access
     match /categories/{categoryId} {
       allow read: if true;

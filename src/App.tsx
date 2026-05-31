@@ -124,8 +124,8 @@ export default function App() {
     { id: 'ship_4', name: 'Other Emirates', charge: 60 }
   ]);
 
-  // Synchronize orders, products, and users with global server databases on startup
-  useEffect(() => {
+  // Synchronize orders, products, and users with global server databases with rapid real-time polling
+  const syncDatabaseGlobal = () => {
     fetch('/api/products')
       .then((res) => res.json())
       .then((data) => {
@@ -176,10 +176,20 @@ export default function App() {
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setShippingAreas(data);
-          setCheckoutArea(data[0].id);
+          // Only initialize checkout area once if it hasn't been set yet
+          setCheckoutArea((prev) => prev || data[0].id);
         }
       })
       .catch((err) => console.error('Failed to sync shipping areas from server:', err));
+  };
+
+  useEffect(() => {
+    // Initial fetch on mount
+    syncDatabaseGlobal();
+    
+    // Set up rapid background real-time synchronization every 3.5 seconds
+    const interval = setInterval(syncDatabaseGlobal, 3500);
+    return () => clearInterval(interval);
   }, []);
 
   // --- Active Viewer Session Heartbeat ---
