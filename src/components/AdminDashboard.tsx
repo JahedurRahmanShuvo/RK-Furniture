@@ -1291,96 +1291,115 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
           {/* 2. PRODUCTS CATALOG TAB */}
           {activeTab === 'products' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-800">
-                <div className="text-left">
+            <div className="space-y-5">
+              {/* Header block with orange dot and Add Product button as shown in user screenshot */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] ring-4 ring-[#f59e0b]/20" />
+                  <h3 className="text-sm sm:text-base font-extrabold text-[#1e293b] tracking-wider font-sans uppercase">
+                    PRODUCTS INVENTORY
+                  </h3>
                 </div>
                 <button 
                   onClick={() => {
                     setIsAddingProduct(true);
                     setEditingProduct(null);
                     setProdName('');
-                    setProdCategory('Furniture');
+                    setProdCategory(localCategories[0]?.name || 'Furniture');
                     setProdPrice(0);
                     setProdOldPrice(undefined);
                     setProdDesc('');
                     setProdImage('');
                     setProdIsTrending(false);
+                    showToast('Publish drawer opened. Fill in details to publish!', 'info');
                   }}
-                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold py-2 px-3 rounded-lg flex items-center gap-1 transition"
+                  className="bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-black py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition duration-150 active:scale-95 shadow-md shadow-[#f59e0b]/10 cursor-pointer focus:outline-none"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5 text-white stroke-[3px]" />
                   <span>Add Product</span>
                 </button>
               </div>
 
               {/* Product Query Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                <Search className="absolute left-4 top-[15px] w-4 h-4 text-slate-400" />
                 <input 
                   type="text" 
                   placeholder="Search inventories by label or category..."
                   value={productQuery}
                   onChange={(e) => setProductQuery(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-9 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500"
+                  className="w-full bg-[#f8fafc] border border-slate-200/90 rounded-2xl py-3.5 pl-11 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#f59e0b] focus:bg-white focus:ring-4 focus:ring-[#f59e0b]/15 transition-all font-semibold font-sans"
                 />
               </div>
 
-              {/* Products Table/Grid view */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Products Grid view with extra polished styling */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 {filteredProducts.map((prod) => (
-                  <div key={prod.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex gap-3">
+                  <div key={prod.id} className="bg-white border border-slate-100/95 rounded-2xl p-3.5 flex gap-4 shadow-sm hover:shadow-md hover:border-slate-200 transition duration-150 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-[#f59e0b]/10 group-hover:bg-[#f59e0b] transition-all" />
+                    
                     {prod.image === 'placeholder_box' ? (
-                      <div className="w-16 h-16 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
-                        <Box className="w-8 h-8" />
+                      <div className="w-20 h-20 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                        <Box className="w-10 h-10" />
                       </div>
                     ) : (
-                      <img src={prod.image} alt={prod.name} className="w-16 h-16 rounded object-cover border border-slate-200 shrink-0" referrerPolicy="no-referrer" />
+                      <img 
+                        src={prod.image} 
+                        alt={prod.name} 
+                        className="w-20 h-20 rounded-xl object-cover border border-slate-100 shrink-0" 
+                        referrerPolicy="no-referrer" 
+                      />
                     )}
 
-                    <div className="text-left flex-1 space-y-1">
-                      <div className="flex items-start justify-between">
-                        <h4 className="text-xs font-bold text-slate-900 line-clamp-1">{prod.name}</h4>
-                        <span className="bg-white hover:bg-slate-100 text-[9px] text-slate-600 border border-slate-200 rounded px-1.5 py-0.5 shrink-0 ml-1.5">
-                          {prod.category}
-                        </span>
+                    <div className="text-left flex-1 flex flex-col justify-between min-w-0">
+                      <div className="space-y-1">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <h4 className="text-xs sm:text-sm font-black text-slate-900 line-clamp-1 py-0.5">{prod.name}</h4>
+                          <span className="bg-emerald-50 text-[9px] font-black tracking-tight text-emerald-700 border border-emerald-100/60 rounded-lg px-2 py-0.5 shrink-0 select-none">
+                            {prod.category}
+                          </span>
+                        </div>
+                        
+                        <p className="text-xs sm:text-sm font-bold text-slate-600 font-mono flex items-center gap-2">
+                          <span className="text-[#f59e0b] stroke-none">{prod.price.toLocaleString()} AED</span>
+                          {prod.oldPrice && (
+                            <span className="text-[10px] text-slate-400 line-through font-normal">{prod.oldPrice} AED</span>
+                          )}
+                        </p>
                       </div>
-                      
-                      <p className="text-xs font-semibold text-slate-700 font-mono">
-                        {prod.price.toLocaleString()} AED
-                        {prod.oldPrice && (
-                          <span className="text-[10px] text-slate-400 line-through ml-2">{prod.oldPrice} AED</span>
-                        )}
-                      </p>
 
-                      {prod.isTrending && (
-                        <span className="inline-block bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-semibold px-1.5 rounded">
-                          Trending Spot
-                        </span>
-                      )}
-
-                      <div className="flex justify-end gap-1.5 pt-1.5 border-t border-slate-200 mt-1">
-                        <button 
-                          onClick={() => {
-                            setEditingProduct(prod);
-                            setProdName(prod.name);
-                            setProdCategory(prod.category);
-                            setProdPrice(prod.price);
-                            setProdOldPrice(prod.oldPrice);
-                            setProdDesc(prod.description || '');
-                            setProdImage(prod.image);
-                            setProdIsTrending(!!prod.isTrending);
-                          }}
-                          className="p-1 px-2 border border-slate-200 bg-white hover:bg-slate-100 rounded text-indigo-600 hover:text-indigo-700 transition text-[10px] font-bold cursor-pointer"
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          onClick={() => deleteProduct(prod.id)}
-                          className="p-1 px-2 border border-red-200 bg-red-50 hover:bg-red-100 rounded text-red-600 hover:text-red-700 transition text-[10px] font-bold cursor-pointer"
-                        >
-                          Delete
-                        </button>
+                      <div className="flex items-center justify-between border-t border-slate-100/80 pt-2 mt-2">
+                        <div>
+                          {prod.isTrending && (
+                            <span className="inline-block bg-orange-50 text-[#f59e0b] border border-orange-100/60 text-[9px] font-extrabold px-2 py-0.5 rounded-md select-none uppercase">
+                              Trending
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex gap-1.5">
+                          <button 
+                            onClick={() => {
+                              setEditingProduct(prod);
+                              setProdName(prod.name);
+                              setProdCategory(prod.category);
+                              setProdPrice(prod.price);
+                              setProdOldPrice(prod.oldPrice);
+                              setProdDesc(prod.description || '');
+                              setProdImage(prod.image);
+                              setProdIsTrending(!!prod.isTrending);
+                            }}
+                            className="px-2.5 py-1.5 border border-slate-150 bg-[#f8fafc] hover:bg-slate-100 rounded-lg text-slate-700 hover:text-slate-900 transition text-[10px] font-black cursor-pointer shadow-sm focus:outline-none"
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => deleteProduct(prod.id)}
+                            className="px-2.5 py-1.5 border border-red-100 bg-red-50/50 hover:bg-red-50 rounded-lg text-red-600 hover:text-red-700 transition text-[10px] font-black cursor-pointer shadow-sm focus:outline-none"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

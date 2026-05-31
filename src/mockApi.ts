@@ -180,6 +180,101 @@ export function setupMockApiInterceptor() {
   }
 }
 
+import { db } from './firebase';
+import { 
+  collection, 
+  getDocs, 
+  setDoc, 
+  doc, 
+  deleteDoc, 
+  getDoc 
+} from 'firebase/firestore';
+
+// Helper to fetch collection directly from Firestore with fallback & seeding
+async function getFirestoreCollection<T>(collectionName: string, defaultValue: T[]): Promise<T[]> {
+  try {
+    const colRef = collection(db, collectionName);
+    const snapshot = await getDocs(colRef);
+    if (!snapshot.empty) {
+      const items: T[] = [];
+      snapshot.forEach((d) => {
+        items.push({ ...d.data() } as any);
+      });
+      // Sort collections if necessary
+      if (collectionName === 'orders') {
+        (items as any[]).sort((a, b) => {
+          const idA = String(a.id || '');
+          const idB = String(b.id || '');
+          return idB.localeCompare(idA);
+        });
+      } else {
+        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      }
+      return items;
+    } else {
+      // Seed Firestore with default value
+      for (const item of defaultValue) {
+        const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
+        await setDoc(doc(db, collectionName, docId), item);
+      }
+      return defaultValue;
+    }
+  } catch (err) {
+    console.warn(`[Firestore sync fallback] Failed for ${collectionName}:`, err);
+    // Fallback to local storage
+    const stored = localStorage.getItem(`netlify_${collectionName}`);
+    if (stored) {
+      try { return JSON.parse(stored); } catch { return defaultValue; }
+    }
+    return defaultValue;
+  }
+}
+
+async function getFirestoreUsers(): Promise<{ [key: string]: any }> {
+  try {
+    const colRef = collection(db, 'users');
+    const snapshot = await getDocs(colRef);
+    const usersObj: { [key: string]: any } = {};
+    if (!snapshot.empty) {
+      snapshot.forEach((d) => {
+        usersObj[d.id] = d.data();
+      });
+      return usersObj;
+    } else {
+      for (const phone in DEFAULT_USERS) {
+        await setDoc(doc(db, 'users', phone), (DEFAULT_USERS as any)[phone]);
+      }
+      return DEFAULT_USERS;
+    }
+  } catch (err) {
+    console.warn(`[Firestore users sync error]`, err);
+    // Fallback to local storage
+    const stored = localStorage.getItem('rk_registered_users');
+    if (stored) {
+      try { return JSON.parse(stored); } catch { return DEFAULT_USERS; }
+    }
+    return DEFAULT_USERS;
+  }
+}
+
+async function saveFirestoreDoc(collectionName: string, docId: string, data: any) {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await setDoc(docRef, data);
+  } catch (err) {
+    console.error(`[Firestore saveDoc error] ${collectionName}/${docId}:`, err);
+  }
+}
+
+async function deleteFirestoreDoc(collectionName: string, docId: string) {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error(`[Firestore deleteDoc error] ${collectionName}/${docId}:`, err);
+  }
+}
+
 async function handleMockRequest(url: string, method: string, init: RequestInit | undefined): Promise<Response> {
   // Extract route after "/api/"
   const parts = url.split('/api/');
@@ -191,27 +286,9 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
   let status = 200;
   let responseData: any = null;
 
-  // Initial read helpers mapping to local storage
-  const getStored = (key: string, defaultValue: any) => {
-    const data = localStorage.getItem(key);
-    if (!data) {
-      localStorage.setItem(key, JSON.stringify(defaultValue));
-      return defaultValue;
-    }
-    try {
-      return JSON.parse(data);
-    } catch {
-      return defaultValue;
-    }
-  };
-
-  const setStored = (key: string, value: any) => {
-    localStorage.setItem(key, JSON.stringify(value));
-  };
-
   // 1. PRODUCTS
   if (resource === 'products') {
-    const currentProducts = getStored('netlify_products', DEFAULT_PRODUCTS);
+    const currentProducts = await getFirestoreCollection('products', DEFAULT_PRODUCTS);
 
     if (method === 'GET') {
       responseData = currentProducts;
@@ -220,38 +297,40 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
       if (!payload.id) {
         payload.id = 'product_' + Date.now();
       }
-      currentProducts.push(payload);
-      setStored('netlify_products', currentProducts);
+      await saveFirestoreDoc('products', payload.id, payload);
       responseData = payload;
       status = 201;
     } else if (method === 'PUT' && idValue) {
       const payload = JSON.parse(init?.body as string);
       const idx = currentProducts.findIndex((p: any) => p.id === idValue);
       if (idx !== -1) {
-        currentProducts[idx] = { ...currentProducts[idx], ...payload };
-        setStored('netlify_products', currentProducts);
-        responseData = currentProducts[idx];
+        const updated = { ...currentProducts[idx], ...payload };
+        await saveFirestoreDoc('products', idValue, updated);
+        responseData = updated;
       } else {
         status = 404;
         responseData = { error: 'Product not found' };
       }
     } else if (method === 'DELETE' && idValue) {
-      const filtered = currentProducts.filter((p: any) => p.id !== idValue);
-      setStored('netlify_products', filtered);
+      await deleteFirestoreDoc('products', idValue);
       responseData = { success: true, message: 'Product deleted' };
     }
   }
 
   // 2. SLIDES
   else if (resource === 'slides') {
-    const currentSlides = getStored('netlify_slides', DEFAULT_SLIDES);
+    const currentSlides = await getFirestoreCollection('slides', DEFAULT_SLIDES);
 
     if (method === 'GET') {
       responseData = currentSlides;
     } else if (method === 'POST') {
       const payload = JSON.parse(init?.body as string);
       if (Array.isArray(payload)) {
-        setStored('netlify_slides', payload);
+        for (const slide of payload) {
+          if (slide.id) {
+            await saveFirestoreDoc('slides', slide.id, slide);
+          }
+        }
         responseData = { success: true, slides: payload };
       } else {
         status = 400;
@@ -262,7 +341,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
 
   // 3. CATEGORIES
   else if (resource === 'categories') {
-    const currentCategories = getStored('netlify_categories', DEFAULT_CATEGORIES);
+    const currentCategories = await getFirestoreCollection('categories', DEFAULT_CATEGORIES);
 
     if (method === 'GET') {
       responseData = currentCategories;
@@ -272,24 +351,22 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
         payload.id = 'category_' + Date.now();
       }
       const existingIdx = currentCategories.findIndex((c: any) => c.name.toLowerCase() === payload.name.toLowerCase() || c.id === payload.id);
+      let finalDoc = payload;
       if (existingIdx !== -1) {
-        currentCategories[existingIdx] = { ...currentCategories[existingIdx], ...payload };
-      } else {
-        currentCategories.push(payload);
+        finalDoc = { ...currentCategories[existingIdx], ...payload };
       }
-      setStored('netlify_categories', currentCategories);
-      responseData = payload;
+      await saveFirestoreDoc('categories', payload.id, finalDoc);
+      responseData = finalDoc;
       status = 201;
     } else if (method === 'DELETE' && idValue) {
-      const filtered = currentCategories.filter((c: any) => c.id !== idValue);
-      setStored('netlify_categories', filtered);
+      await deleteFirestoreDoc('categories', idValue);
       responseData = { success: true, message: 'Category deleted' };
     }
   }
 
   // 3b. SHIPPING AREAS
   else if (resource === 'shipping-areas') {
-    const currentAreas = getStored('netlify_shipping_areas', DEFAULT_SHIPPING_AREAS);
+    const currentAreas = await getFirestoreCollection('shipping_areas', DEFAULT_SHIPPING_AREAS);
 
     if (method === 'GET') {
       responseData = currentAreas;
@@ -300,67 +377,58 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
       }
       payload.charge = Number(payload.charge);
       const existingIdx = currentAreas.findIndex((a: any) => a.id === payload.id || a.name.toLowerCase() === payload.name.toLowerCase());
+      let finalDoc = payload;
       if (existingIdx !== -1) {
-        currentAreas[existingIdx] = { ...currentAreas[existingIdx], ...payload };
-      } else {
-        currentAreas.push(payload);
+        finalDoc = { ...currentAreas[existingIdx], ...payload };
       }
-      setStored('netlify_shipping_areas', currentAreas);
-      responseData = payload;
+      await saveFirestoreDoc('shipping_areas', payload.id, finalDoc);
+      responseData = finalDoc;
       status = 201;
     } else if (method === 'DELETE' && idValue) {
-      const filtered = currentAreas.filter((a: any) => a.id !== idValue);
-      setStored('netlify_shipping_areas', filtered);
+      await deleteFirestoreDoc('shipping_areas', idValue);
       responseData = { success: true, message: 'Shipping area deleted' };
     }
   }
 
   // 4. ORDERS
   else if (resource === 'orders') {
-    // Sync seamlessly with existing local storage keys to prevent duplicate states
-    const currentOrders = getStored('rk_orders', getStored('netlify_orders', []));
+    const currentOrders = await getFirestoreCollection('orders', []);
 
     if (method === 'GET') {
       responseData = currentOrders;
     } else if (method === 'POST') {
       const payload = JSON.parse(init?.body as string);
-      currentOrders.unshift(payload);
-      setStored('rk_orders', currentOrders);
-      setStored('netlify_orders', currentOrders);
+      const orderId = String(payload.id || 'order_' + Date.now());
+      await saveFirestoreDoc('orders', orderId, payload);
       responseData = payload;
       status = 201;
     } else if (method === 'PUT' && idValue) {
       const payload = JSON.parse(init?.body as string);
       const idx = currentOrders.findIndex((o: any) => o.id === idValue);
       if (idx !== -1) {
-        currentOrders[idx] = { ...currentOrders[idx], ...payload };
-        setStored('rk_orders', currentOrders);
-        setStored('netlify_orders', currentOrders);
-        responseData = currentOrders[idx];
+        const updated = { ...currentOrders[idx], ...payload };
+        await saveFirestoreDoc('orders', idValue, updated);
+        responseData = updated;
       } else {
         status = 404;
         responseData = { error: 'Order not found' };
       }
     } else if (method === 'DELETE' && idValue) {
-      const filtered = currentOrders.filter((o: any) => o.id !== idValue);
-      setStored('rk_orders', filtered);
-      setStored('netlify_orders', filtered);
+      await deleteFirestoreDoc('orders', idValue);
       responseData = { success: true, message: 'Order deleted successfully' };
     }
   }
 
   // 5. USERS
   else if (resource === 'users') {
-    const currentUsers = getStored('rk_registered_users', getStored('netlify_users', DEFAULT_USERS));
+    const currentUsers = await getFirestoreUsers();
 
     if (method === 'GET') {
       responseData = currentUsers;
     } else if (method === 'POST') {
       const { phone, userObj } = JSON.parse(init?.body as string);
       if (phone && userObj) {
-        currentUsers[phone] = userObj;
-        setStored('rk_registered_users', currentUsers);
-        setStored('netlify_users', currentUsers);
+        await saveFirestoreDoc('users', phone, userObj);
         responseData = { success: true, user: userObj };
       } else {
         status = 400;
@@ -384,7 +452,6 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
       }
       responseData = { success: true };
     } else if (idValue === 'active' && method === 'GET') {
-      // Filter out stale sessions older than 45 seconds
       const now = Date.now();
       const list = Object.values(activeSessions).filter((s: any) => now - s.lastSeen < 45000);
       responseData = list;
