@@ -470,8 +470,13 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     saveSlidesList(updated, 'Slide banner details updated successfully!');
   };
 
-  const handleDeleteSlide = (slideId: string) => {
-    const updated = localSlides.filter((s) => s.id !== slideId);
+  const handleDeleteSlide = (slideId: string, index: number) => {
+    const updated = localSlides.filter((s, idx) => {
+      if (slideId) {
+        return s.id !== slideId;
+      }
+      return idx !== index;
+    });
     saveSlidesList(updated, 'Slide banner deleted successfully!');
   };
 
@@ -1905,7 +1910,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                             <span>Edit Design</span>
                           </button>
                           <button
-                            onClick={() => handleDeleteSlide(slide.id)}
+                            onClick={() => handleDeleteSlide(slide.id, index)}
                             className="bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-bold py-1.5 rounded flex items-center justify-center gap-1 focus:outline-none border border-red-200 cursor-pointer transition-colors"
                           >
                             <Trash2 className="w-3 h-3 text-red-500" />

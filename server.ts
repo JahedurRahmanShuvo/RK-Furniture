@@ -121,7 +121,11 @@ async function loadCollectionFromFirestore<T>(collectionName: string, localFileP
     if (!snapshot.empty) {
       const items: T[] = [];
       snapshot.forEach((d) => {
-        items.push(d.data() as T);
+        const item = d.data() as any;
+        if (item && !item.id) {
+          item.id = d.id;
+        }
+        items.push(item as T);
       });
       
       // Ensure collections stay sorted
@@ -525,7 +529,7 @@ app.post('/api/slides', async (req, res) => {
         await saveDocToFirestore('slides', slide.id, slide);
       }
     }
-    // Cleanup deleted slides from Firestore in background
+    // Cleanup deleted slides from Firestore and await it
     try {
       const colRef = collection(db, 'slides');
       const snapshot = await getDocs(colRef);
@@ -535,7 +539,9 @@ app.post('/api/slides', async (req, res) => {
           await deleteDoc(dSnap.ref);
         }
       }
-    } catch (_) {}
+    } catch (err) {
+      console.error('Firestore slides cleanup error:', err);
+    }
     res.json({ success: true, slides });
   } else {
     res.status(400).json({ error: 'Must be an array' });

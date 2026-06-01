@@ -155,7 +155,7 @@ export default function App() {
     fetch('/api/slides')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setSlides(data);
         }
       })
@@ -238,7 +238,7 @@ export default function App() {
           fetch('/api/slides')
             .then((res) => res.json())
             .then((data) => {
-              if (Array.isArray(data) && data.length > 0) {
+              if (Array.isArray(data)) {
                 setSlides(data);
               }
             }),
@@ -1028,7 +1028,7 @@ export default function App() {
           fetch('/api/slides')
             .then((res) => res.json())
             .then((data) => {
-              if (Array.isArray(data) && data.length > 0) {
+              if (Array.isArray(data)) {
                 setSlides(data);
               }
             })
