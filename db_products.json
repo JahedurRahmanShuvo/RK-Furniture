@@ -1,67 +1,67 @@
 [
   {
-    "oldPrice": 4500,
+    "description": "Immerse Yourself in ultimate luxury. Premium quality solid mahogany wood framed royal sofa with high-density plush comfort padding and luxurious upholstery.",
     "id": "prod_1",
+    "category": "Sofa",
     "isTrending": true,
-    "price": 3200,
-    "image": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80",
-    "name": "Royal Mahogany Sofa Set",
     "images": [
       "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80"
     ],
-    "description": "Immerse Yourself in ultimate luxury. Premium quality solid mahogany wood framed royal sofa with high-density plush comfort padding and luxurious upholstery.",
-    "category": "Sofa"
+    "price": 3200,
+    "oldPrice": 4500,
+    "image": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80",
+    "name": "Royal Mahogany Sofa Set"
   },
   {
-    "image": "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=600&q=80",
-    "name": "Premium King Size Bed",
+    "description": "Beautifully crafted premium king-size bed made from season-treated premium Malaysian timber, offering durability and classic mid-century royalty design.",
+    "isTrending": true,
     "category": "Bed",
+    "id": "prod_2",
     "images": [
       "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=600&q=80"
     ],
-    "description": "Beautifully crafted premium king-size bed made from season-treated premium Malaysian timber, offering durability and classic mid-century royalty design.",
+    "name": "Premium King Size Bed",
+    "image": "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=600&q=80",
     "oldPrice": 5500,
-    "id": "prod_2",
-    "isTrending": true,
     "price": 4200
   },
   {
-    "image": "https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=600&q=80",
     "description": "High polish mahogany wood dining table with 6 comfortable cushioned dining chairs. Resilien gloss lacquer shielding from food & drink spills.",
+    "isTrending": false,
+    "id": "prod_3",
+    "category": "Dining",
     "images": [
       "https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=600&q=80"
     ],
-    "category": "Dining",
-    "name": "Classic Wooden Dinning Set",
-    "id": "prod_3",
     "oldPrice": 3200,
-    "price": 2400,
-    "isTrending": false
+    "image": "https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=600&q=80",
+    "name": "Classic Wooden Dinning Set",
+    "price": 2400
   },
   {
-    "price": 1950,
     "isTrending": false,
-    "oldPrice": 2600,
-    "id": "prod_4",
     "category": "Wardrobe",
+    "id": "prod_4",
     "description": "An expansive three-door wardrobe cabinet. Comes with integrated inner drawers, hanging rails, and vanity mirror setup.",
+    "image": "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80",
+    "name": "Modern Wardrobe Cabinet",
+    "oldPrice": 2600,
+    "price": 1950,
     "images": [
       "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80"
-    ],
-    "name": "Modern Wardrobe Cabinet",
-    "image": "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80"
+    ]
   },
   {
-    "image": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80",
-    "images": [
-      "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80"
-    ],
-    "description": "Add a vintage aesthetic touch to your reading lounge or study corner. Constructed from steam-bent Teak wood frame.",
+    "isTrending": true,
     "category": "Sofa",
-    "name": "Cozy Retro Accent Chair",
     "id": "prod_5",
+    "description": "Add a vintage aesthetic touch to your reading lounge or study corner. Constructed from steam-bent Teak wood frame.",
+    "name": "Cozy Retro Accent Chair",
+    "image": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80",
     "oldPrice": 1200,
     "price": 850,
-    "isTrending": true
+    "images": [
+      "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80"
+    ]
   }
 ]

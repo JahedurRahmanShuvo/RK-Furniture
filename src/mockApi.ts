@@ -351,6 +351,18 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
             await saveFirestoreDoc('slides', slide.id, slide);
           }
         }
+        // Properly cleanup deleted slides from Firestore
+        try {
+          const colRef = collection(db, 'slides');
+          const snapshot = await getDocs(colRef);
+          for (const dSnap of snapshot.docs) {
+            if (!payload.some((s: any) => s.id === dSnap.id)) {
+              await deleteDoc(dSnap.ref);
+            }
+          }
+        } catch (err) {
+          console.error('Mock Firestore slides cleanup error:', err);
+        }
         responseData = { success: true, slides: payload };
       } else {
         status = 400;
