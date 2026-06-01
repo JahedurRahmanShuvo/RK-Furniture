@@ -527,10 +527,12 @@ app.post('/api/slides', async (req, res) => {
     }
     // Cleanup deleted slides from Firestore in background
     try {
-      const dbSlides = await loadCollectionFromFirestore('slides', SLIDES_DB_PATH, INITIAL_SLIDES);
-      for (const dS of dbSlides) {
-        if (!slides.some((s: any) => s.id === dS.id)) {
-          await deleteDocFromFirestore('slides', dS.id);
+      const colRef = collection(db, 'slides');
+      const snapshot = await getDocs(colRef);
+      for (const dSnap of snapshot.docs) {
+        const dId = dSnap.id;
+        if (!slides.some((s: any) => s.id === dId)) {
+          await deleteDoc(dSnap.ref);
         }
       }
     } catch (_) {}
