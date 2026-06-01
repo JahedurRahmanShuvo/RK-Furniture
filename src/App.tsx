@@ -216,19 +216,84 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Initial fetch on mount
-    syncDatabaseGlobal();
-    
-    // Show the gorgeous loading screen for 1200ms when refreshing or visiting to fulfill requirement precisely
-    const timer = setTimeout(() => {
-      setAppLoading(false);
-    }, 1200);
+    const runInitialSync = async () => {
+      try {
+        // Fetch products, slides, and categories in parallel first to block loading screen until everything arrives
+        await Promise.allSettled([
+          fetch('/api/products')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setProducts(data);
+              }
+            }),
+          fetch('/api/slides')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data) && data.length > 0) {
+                setSlides(data);
+              }
+            }),
+          fetch('/api/categories')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setCategories(data);
+              }
+            }),
+          fetch('/api/shipping-areas')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data) && data.length > 0) {
+                setShippingAreas(data);
+                setCheckoutArea((prev) => prev || data[0].id);
+              }
+            }),
+          fetch('/api/store-contact')
+            .then((res) => res.json())
+            .then((data) => {
+              if (data && data.phone) {
+                setStoreContact(data);
+              }
+            }),
+          fetch('/api/coupons')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setCoupons(data);
+              }
+            }),
+          fetch('/api/orders')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setOrders(data);
+              }
+            }),
+          fetch('/api/users')
+            .then((res) => res.json())
+            .then((data) => {
+              if (data && typeof data === 'object') {
+                setRegisteredUsers(data);
+              }
+            })
+        ]);
+      } catch (err) {
+        console.error('Error during initial sync:', err);
+      } finally {
+        // Enforce a minimum aesthetic delay of 1200ms so the loading screen doesn't flicker
+        setTimeout(() => {
+          setAppLoading(false);
+        }, 1200);
+      }
+    };
+
+    runInitialSync();
 
     // Set up rapid background real-time synchronization every 3.5 seconds
     const interval = setInterval(syncDatabaseGlobal, 3500);
     return () => {
       clearInterval(interval);
-      clearTimeout(timer);
     };
   }, []);
 
