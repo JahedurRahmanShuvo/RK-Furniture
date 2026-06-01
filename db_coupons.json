@@ -1,0 +1,23 @@
+[
+  {
+    "id": "coupon_1",
+    "discountPercent": 10,
+    "code": "RK10",
+    "description": "10% OFF Discount Coupon",
+    "isActive": true
+  },
+  {
+    "discountPercent": 20,
+    "id": "coupon_2",
+    "code": "SUPER20",
+    "description": "Super 20% discount coupon",
+    "isActive": true
+  },
+  {
+    "description": "Eid Special 30% discount coupon",
+    "isActive": true,
+    "code": "EID30",
+    "discountPercent": 30,
+    "id": "coupon_3"
+  }
+]

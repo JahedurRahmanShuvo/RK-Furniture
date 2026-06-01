@@ -11,10 +11,12 @@ import {
   doc, 
   deleteDoc 
 } from 'firebase/firestore';
+import compression from 'compression';
 
 const app = express();
 const PORT = 3000;
 
+app.use(compression());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -403,8 +405,20 @@ app.delete('/api/products/:id', async (req, res) => {
 
 // 2. ORDERS ENDPOINTS
 app.get('/api/orders', async (req, res) => {
+  const { phone } = req.query;
   const orders = await loadCollectionFromFirestore('orders', ORDERS_DB_PATH, INITIAL_ORDERS);
-  res.json(orders);
+  
+  if (phone === '01700000000') {
+    // Admin request
+    res.json(orders);
+  } else if (phone && typeof phone === 'string') {
+    // Only return orders which match this specific client's phone number
+    const filteredOrders = orders.filter((o: any) => o.customerMobile === phone);
+    res.json(filteredOrders);
+  } else {
+    // Block leakage
+    res.json([]);
+  }
 });
 
 app.post('/api/orders', async (req, res) => {
@@ -465,8 +479,23 @@ app.put('/api/products/:id', async (req, res) => {
 
 // 3. USERS ENDPOINTS (For system registrations database)
 app.get('/api/users', async (req, res) => {
+  const { phone } = req.query;
   const users = await loadUsersFromFirestore();
-  res.json(users);
+  
+  if (phone === '01700000000') {
+    // Admin request
+    res.json(users);
+  } else if (phone && typeof phone === 'string') {
+    // Return ONLY the requested user profile if it exists, blocking other user accounts
+    if (users[phone]) {
+      res.json({ [phone]: users[phone] });
+    } else {
+      res.json({});
+    }
+  } else {
+    // Return empty to block data leakage
+    res.json({});
+  }
 });
 
 app.post('/api/users', async (req, res) => {
@@ -672,7 +701,18 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      maxAge: '1d',
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else if (filePath.match(/\.(js|css|woff2?|png|jpg|jpeg|gif|svg|ico)$/)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+        }
+      }
+    }));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

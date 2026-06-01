@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Search,
@@ -140,6 +140,9 @@ export default function App() {
 
   // Synchronize orders, products, and users with global server databases with rapid real-time polling
   const syncDatabaseGlobal = () => {
+    const currentPhone = user.isLoggedIn && user.phone ? user.phone : '';
+    const phoneParam = `?phone=${currentPhone}`;
+
     fetch('/api/products')
       .then((res) => res.json())
       .then((data) => {
@@ -158,7 +161,7 @@ export default function App() {
       })
       .catch((err) => console.error('Failed to sync slides from server:', err));
 
-    fetch('/api/orders')
+    fetch('/api/orders' + phoneParam)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -167,7 +170,7 @@ export default function App() {
       })
       .catch((err) => console.error('Failed to sync orders from server:', err));
 
-    fetch('/api/users')
+    fetch('/api/users' + phoneParam)
       .then((res) => res.json())
       .then((data) => {
         if (data && typeof data === 'object') {
@@ -218,6 +221,11 @@ export default function App() {
   useEffect(() => {
     const runInitialSync = async () => {
       try {
+        const savedUser = localStorage.getItem('rk_user');
+        const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+        const currentPhone = parsedUser && parsedUser.isLoggedIn && parsedUser.phone ? parsedUser.phone : '';
+        const phoneParam = `?phone=${currentPhone}`;
+
         // Fetch products, slides, and categories in parallel first to block loading screen until everything arrives
         await Promise.allSettled([
           fetch('/api/products')
@@ -263,14 +271,14 @@ export default function App() {
                 setCoupons(data);
               }
             }),
-          fetch('/api/orders')
+          fetch('/api/orders' + phoneParam)
             .then((res) => res.json())
             .then((data) => {
               if (Array.isArray(data)) {
                 setOrders(data);
               }
             }),
-          fetch('/api/users')
+          fetch('/api/users' + phoneParam)
             .then((res) => res.json())
             .then((data) => {
               if (data && typeof data === 'object') {
@@ -281,10 +289,10 @@ export default function App() {
       } catch (err) {
         console.error('Error during initial sync:', err);
       } finally {
-        // Enforce a minimum aesthetic delay of 1200ms so the loading screen doesn't flicker
+        // Enforce a minimum aesthetic delay of 150ms so the loading screen doesn't flicker and opens instantly
         setTimeout(() => {
           setAppLoading(false);
-        }, 1200);
+        }, 150);
       }
     };
 
@@ -397,6 +405,16 @@ export default function App() {
   // Search overlay toggle
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('rk_recent_searches');
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<any>(null);
 
   // Cart slide-out toggle
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
@@ -427,18 +445,23 @@ export default function App() {
   useEffect(() => {
     if (view === 'checkout') {
       if (user && user.isLoggedIn) {
-        if (!checkoutName) {
-          setCheckoutName(user.name || '');
-        }
-        if (!checkoutMobile) {
-          setCheckoutMobile(user.phone || '');
-        }
-        if (!checkoutAddress && addresses && addresses.length > 0) {
+        setCheckoutName(user.name || '');
+        setCheckoutMobile(user.phone || '');
+        if (addresses && addresses.length > 0) {
           setCheckoutAddress(addresses[0].address || '');
+        } else {
+          setCheckoutAddress('');
         }
+      } else {
+        setCheckoutName('');
+        setCheckoutMobile('');
+        setCheckoutAddress('');
+        setCheckoutGlobalCountry('');
+        setCheckoutGlobalCity('');
+        setCheckoutNote('');
       }
     }
-  }, [view, user, addresses, checkoutName, checkoutMobile, checkoutAddress]);
+  }, [view, user?.isLoggedIn]);
 
   // Auth form states
   const [loginPhone, setLoginPhone] = useState('');
@@ -615,6 +638,13 @@ export default function App() {
     const adminPassword = localStorage.getItem('rk_admin_password') || 'rkfurniture0123';
     if (loginPhone === '01700000000') {
       if (loginPassword === adminPassword) {
+        // Fetch all registered users for Admin View
+        try {
+          const resp = await fetch('/api/users?phone=01700000000');
+          const allUsers = await resp.json();
+          setRegisteredUsers(allUsers);
+        } catch (_) {}
+
         // Log into Firebase Auth as admin
         try {
           const adminEmail = 'admin@rkfurniture.com';
@@ -646,7 +676,16 @@ export default function App() {
       }
     }
 
-    const registered = registeredUsers[loginPhone];
+    // Fetch only this user on-demand to stay perfectly secure
+    let registered;
+    try {
+      const resp = await fetch(`/api/users?phone=${loginPhone}`);
+      const data = await resp.json();
+      registered = data[loginPhone];
+    } catch (err) {
+      console.error('Failed to load user during login:', err);
+    }
+
     if (!registered) {
       setAuthError('This phone number is not registered. Please sign up first.');
       return;
@@ -655,6 +694,19 @@ export default function App() {
       setAuthError('Incorrect password. Please try again.');
       return;
     }
+
+    // Populate local profile with dynamic address lists synced from database
+    if (Array.isArray(registered.addresses)) {
+      setAddresses(registered.addresses);
+    } else {
+      setAddresses([]);
+    }
+
+    // Populate registeredUsers map with only the current user so existing components don't crash
+    setRegisteredUsers(prev => ({
+      ...prev,
+      [loginPhone]: registered
+    }));
 
     // Firebase Auth Authentication Integration
     const targetEmail = registered.email || `${loginPhone}@rkfurniture.com`;
@@ -809,6 +861,12 @@ export default function App() {
       address: newAddressDetails
     };
     setAddresses((prev) => [...prev, nAddress]);
+    
+    // Automatically set the newly created address as the active billing & shipping details!
+    setCheckoutName(nAddress.name);
+    setCheckoutMobile(nAddress.mobile);
+    setCheckoutAddress(nAddress.address);
+
     setNewAddressName('');
     setNewAddressMobile('');
     setNewAddressEmail('');
@@ -824,11 +882,11 @@ export default function App() {
     if (found) {
       setPromoApplied(true);
       setPromoDiscountPercent(found.discountPercent);
-      setPromoMessage(`অভিনন্দন! আপনার "${found.code}" কোডটি সফলভাবে যুক্ত হয়েছে। আপনি ${found.discountPercent}% ছাড় পেয়েছেন।`);
+      setPromoMessage(`Congratulations! Your coupon "${found.code}" has been applied successfully. You get a ${found.discountPercent}% discount!`);
     } else {
       setPromoApplied(false);
       setPromoDiscountPercent(0);
-      setPromoMessage('ভুল কিংবা নিষ্ক্রিয় কোড! অনুগ্রহ করে যাচাই করে পুনরায় চেষ্টা করুন।');
+      setPromoMessage('Invalid or inactive coupon code! Please verify and try again.');
     }
   };
 
@@ -952,7 +1010,7 @@ export default function App() {
         <div className="relative flex flex-col items-center select-none">
           {/* Circular spinner matching user image precisely: light-grey circle on bottom, dark-arc spinning on top */}
           <div className="w-16 h-16 rounded-full border-[6px] border-[#e2e8f0] border-t-[#222222] animate-spin mb-5" />
-          <span className="text-[#222222] text-xl font-extrabold tracking-wide font-sans">Loading...</span>
+          <span className="text-[#222222] text-xl font-bold tracking-wide font-sans">Loading...</span>
         </div>
       </div>
     );
@@ -1051,7 +1109,7 @@ export default function App() {
                     })()}
 
                     <div className="text-left">
-                      <h3 className="font-extrabold text-slate-800 text-base leading-none font-sans">
+                      <h3 className="font-bold text-slate-800 text-base leading-none font-sans">
                         {selectedCategory}
                       </h3>
                       <p className="text-xs text-slate-400 font-bold mt-1 font-sans">
@@ -1104,7 +1162,7 @@ export default function App() {
                                 }}
                                 className="cursor-pointer space-y-0.5 block text-left"
                               >
-                                <h4 className="font-extrabold text-slate-800 hover:text-green-700 tracking-tight font-sans text-xs sm:text-sm line-clamp-2 min-h-[32px] sm:min-h-[40px] leading-tight font-sans">
+                                <h4 className="font-bold text-slate-800 hover:text-green-700 tracking-tight font-sans text-xs sm:text-sm line-clamp-2 min-h-[32px] sm:min-h-[40px] leading-tight font-sans">
                                   {prod.name}
                                 </h4>
                               </div>
@@ -1114,7 +1172,7 @@ export default function App() {
                                 const { currentPrice, oldPrice } = getProductPrices(prod);
                                 return (
                                   <div className="flex items-center flex-wrap gap-2 text-left font-mono">
-                                    <span className="text-[#c25927] font-black text-xs sm:text-sm">
+                                    <span className="text-[#c25927] font-bold text-xs sm:text-sm">
                                       {currentPrice.toLocaleString()} AED
                                     </span>
                                     {oldPrice && (
@@ -1173,33 +1231,13 @@ export default function App() {
                     const currentSlide = slides[activeSlide] || slides[0];
                     if (!currentSlide) return null;
                     return (
-                      <div className="relative rounded-2xl overflow-hidden h-44 sm:h-56 shadow-md border-r-4 border-[#c25927] flex items-center">
+                      <div className="relative rounded-2xl overflow-hidden h-44 sm:h-56 shadow-md border border-slate-100 flex items-center bg-slate-50">
                         <img
                           src={currentSlide.bg}
                           alt="Banner"
-                          className="absolute inset-0 w-full h-full object-cover brightness-[0.4]"
+                          className="absolute inset-0 w-full h-full object-cover"
                           referrerPolicy="no-referrer"
                         />
-                        <div className="relative z-10 p-6 text-white max-w-sm space-y-1.5">
-                          <h2 className="font-extrabold text-xl sm:text-2xl leading-none text-orange-100 font-sans tracking-tight">
-                            {currentSlide.title}
-                          </h2>
-                          <p className="text-[11px] sm:text-xs text-slate-200">
-                            {currentSlide.subtitle}
-                          </p>
-                          <button
-                            onClick={() => {
-                              setSelectedCategory(null);
-                              const el = document.getElementById('section-trending-products') || document.getElementById('section-all-products');
-                              if (el) {
-                                el.scrollIntoView({ behavior: 'smooth' });
-                              }
-                            }}
-                            className="mt-2 text-[10px] bg-[#c25927] hover:bg-[#b04d20] cursor-pointer font-bold px-3 py-1 rounded transition text-white"
-                          >
-                            Browse Collections
-                          </button>
-                        </div>
                       </div>
                     );
                   })()}
@@ -1212,7 +1250,7 @@ export default function App() {
                 return (
                   <div className="space-y-4" id="section-trending-products">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-extrabold text-slate-800 text-base sm:text-lg tracking-tight font-sans">
+                      <h3 className="font-bold text-slate-800 text-base sm:text-lg tracking-tight font-sans">
                         Trending Products
                       </h3>
                       <button
@@ -1267,7 +1305,7 @@ export default function App() {
                                 }}
                                 className="cursor-pointer space-y-1 block text-left"
                               >
-                                <h4 className="font-extrabold text-slate-800 hover:text-green-700 tracking-tight font-sans text-sm sm:text-base leading-tight line-clamp-1">
+                                <h4 className="font-bold text-slate-800 hover:text-green-700 tracking-tight font-sans text-sm sm:text-base leading-tight line-clamp-1">
                                   {prod.name}
                                 </h4>
                               </div>
@@ -1277,7 +1315,7 @@ export default function App() {
                                 const { currentPrice, oldPrice } = getProductPrices(prod);
                                 return (
                                   <div className="flex items-center gap-2 text-left">
-                                    <span className="text-[#c25927] font-black text-base sm:text-lg">
+                                    <span className="text-[#c25927] font-bold text-base sm:text-lg">
                                       {currentPrice.toLocaleString()} AED
                                     </span>
                                     {oldPrice && (
@@ -1334,7 +1372,7 @@ export default function App() {
                 {/* Featured Category Banner with wardrobe box logo */}
                 <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
                   <div className="space-y-1 block text-left">
-                    <h3 className="font-extrabold text-slate-800 text-base sm:text-lg flex items-center gap-1.5 font-sans">
+                    <h3 className="font-bold text-slate-800 text-base sm:text-lg flex items-center gap-1.5 font-sans">
                       <LayoutGrid className="w-4.5 h-4.5 text-[#15803d]" />
                       <span>All Products</span>
                     </h3>
@@ -1418,7 +1456,7 @@ export default function App() {
                               const { currentPrice, oldPrice } = getProductPrices(prod);
                               return (
                                 <div className="flex items-center gap-2 flex-wrap text-left font-mono">
-                                  <span className="text-[#c25927] font-extrabold text-xs sm:text-sm">
+                                  <span className="text-[#c25927] font-bold text-xs sm:text-sm">
                                     {currentPrice.toLocaleString()} AED
                                   </span>
                                   {oldPrice && (
@@ -1496,7 +1534,7 @@ export default function App() {
                   <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
                 </button>
                 <div className="text-left">
-                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base tracking-tight font-sans">
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base tracking-tight font-sans">
                     Trending Products
                   </h3>
                   <p className="text-[11px] text-slate-400 font-bold">
@@ -1558,7 +1596,7 @@ export default function App() {
                           const { currentPrice, oldPrice } = getProductPrices(prod);
                           return (
                             <div className="flex justify-center items-center gap-1.5 flex-wrap">
-                              <span className="text-[#c25927] font-extrabold text-xs sm:text-sm">
+                              <span className="text-[#c25927] font-bold text-xs sm:text-sm">
                                 {currentPrice.toLocaleString()} AED
                               </span>
                               {oldPrice && (
@@ -1647,10 +1685,75 @@ export default function App() {
               <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                 {/* Left side: Billing / Shipment Form inputs */}
                 <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-base text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5 font-sans">
+                  <h3 className="font-bold text-base text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5 font-sans">
                     <User className="text-[#15803d] w-4.5 h-4.5" />
                     <span>Billing & Shipping Information</span>
                   </h3>
+
+                  {/* Select Shipping Address Section */}
+                  {user && user.isLoggedIn && (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2 text-xs">
+                      <div className="flex justify-between items-center border-b border-slate-100 pb-1 mt-0.5">
+                        <span className="font-bold text-slate-700">Saved Shipping Destinations:</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddAddressModal(true)}
+                          className="bg-[#15803d]/10 hover:bg-[#15803d]/20 text-[#15803d] text-[10px] font-bold py-0.5 px-2 rounded cursor-pointer"
+                        >
+                          ✙ Add New Address
+                        </button>
+                      </div>
+                      {addresses.length === 0 ? (
+                        <p className="text-[10px] text-slate-400 font-medium py-1">No saved shipping addresses yet. Click "Add New Address" or type directly below.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-1.5 max-h-32 overflow-y-auto pr-1">
+                          {addresses.map((addr) => {
+                            const isCurrentlyMatching = 
+                              checkoutName.trim().toLowerCase() === addr.name.trim().toLowerCase() && 
+                              checkoutMobile.trim() === addr.mobile.trim() && 
+                              checkoutAddress.trim().toLowerCase() === addr.address.trim().toLowerCase();
+                            return (
+                              <button
+                                key={addr.id}
+                                type="button"
+                                onClick={() => {
+                                  setCheckoutName(addr.name);
+                                  setCheckoutMobile(addr.mobile);
+                                  setCheckoutAddress(addr.address);
+                                }}
+                                className={`text-left p-1.5 sm:p-2 rounded-lg border text-[11px] transition flex justify-between items-center cursor-pointer ${
+                                  isCurrentlyMatching
+                                    ? 'border-emerald-600 bg-emerald-50/20 font-semibold text-emerald-800'
+                                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                                }`}
+                              >
+                                <div className="truncate pr-2">
+                                  <span className="font-bold block text-slate-800 text-[10.5px]">{addr.name} ({addr.mobile})</span>
+                                  <span className="text-[10px] text-slate-500 block truncate">{addr.address}</span>
+                                </div>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0 ${
+                                  isCurrentlyMatching ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                  {isCurrentlyMatching ? 'Active' : 'Select'}
+                                </span>
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCheckoutName('');
+                              setCheckoutMobile('');
+                              setCheckoutAddress('');
+                            }}
+                            className="text-center py-1 rounded-lg border border-dashed border-red-200 text-[10px] font-bold text-red-600 hover:bg-red-50/50 transition cursor-pointer"
+                          >
+                            ✖ Clear Fields / Keep Empty
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Name field */}
                   <div className="space-y-1 text-xs">
@@ -1777,7 +1880,7 @@ export default function App() {
                 {/* Right side: Your Order Summary Panel */}
                 <div className="space-y-4">
                   <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-base text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5 font-sans">
+                    <h3 className="font-bold text-base text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5 font-sans">
                       <ShoppingCart className="text-[#15803d] w-4.5 h-4.5" />
                       <span>Your Order Summary</span>
                     </h3>
@@ -1843,7 +1946,7 @@ export default function App() {
                             <span>Delivery Charge:</span>
                             <span>{shippingCharge.toLocaleString()} AED</span>
                           </div>
-                          <div className="flex justify-between text-sm font-extrabold text-[#c25927] border-t border-slate-100 pt-2 font-sans">
+                          <div className="flex justify-between text-sm font-bold text-[#c25927] border-t border-slate-100 pt-2 font-sans">
                             <span>Total Payable Amount:</span>
                             <span className="text-[#c25927]">{total.toLocaleString()} AED</span>
                           </div>
@@ -1878,7 +1981,7 @@ export default function App() {
                   {/* Submit checkout CTA button */}
                   <button
                     type="submit"
-                    className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-extrabold text-sm py-3 rounded-2xl shadow-lg hover:shadow-xl transition flex items-center justify-center gap-1.5 focus:outline-none"
+                    className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-bold text-sm py-3 rounded-2xl shadow-lg hover:shadow-xl transition flex items-center justify-center gap-1.5 focus:outline-none"
                   >
                     <span>Place Order</span>
                   </button>
@@ -1900,7 +2003,7 @@ export default function App() {
               </div>
 
               <div className="space-y-1.5">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight font-sans">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight font-sans">
                   Order placed successfully!
                 </h2>
                 <p className="text-xs text-[#15803d] font-bold">
@@ -1932,7 +2035,7 @@ export default function App() {
                 </div>
                 <div className="flex justify-between border-t border-slate-100 pt-2">
                   <span className="text-slate-400 font-bold">Order Total:</span>
-                  <span className="text-[#c25927] font-extrabold text-sm">{latestPlacedOrder.total.toLocaleString()} AED</span>
+                  <span className="text-[#c25927] font-bold text-sm">{latestPlacedOrder.total.toLocaleString()} AED</span>
                 </div>
               </div>
 
@@ -1942,7 +2045,7 @@ export default function App() {
                   onClick={() => {
                     setViewReceiptOrder(latestPlacedOrder);
                   }}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs py-2.5 rounded-xl transition"
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl transition"
                 >
                   View Receipt
                 </button>
@@ -1952,7 +2055,7 @@ export default function App() {
                     setView('track_order');
                     setTrackQuery(latestPlacedOrder.orderNumber);
                   }}
-                  className="bg-[#15803d] hover:bg-emerald-800 text-white font-extrabold text-xs py-2.5 rounded-xl shadow transition"
+                  className="bg-[#15803d] hover:bg-emerald-800 text-white font-bold text-xs py-2.5 rounded-xl shadow transition"
                 >
                   Track Order
                 </button>
@@ -1973,7 +2076,7 @@ export default function App() {
             <div className="space-y-6">
               {/* Heading */}
               <div className="text-center space-y-1 max-w-sm mx-auto">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight font-sans">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight font-sans">
                   Real-time Order Status
                 </h2>
                 <p className="text-xs text-slate-400 leading-relaxed font-sans">
@@ -2122,7 +2225,7 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => setViewReceiptOrder(scannedOrder)}
-                      className="bg-slate-200 hover:bg-slate-300 px-3.5 py-1.5 rounded-lg text-slate-800 text-[11px] font-extrabold transition whitespace-nowrap"
+                      className="bg-slate-200 hover:bg-slate-300 px-3.5 py-1.5 rounded-lg text-slate-800 text-[11px] font-bold transition whitespace-nowrap"
                     >
                       View Receipt
                     </button>
@@ -2137,7 +2240,7 @@ export default function App() {
           {view === 'auth' && (
             <div className="max-w-md mx-auto space-y-6">
               <div className="text-center space-y-1">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight font-sans">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight font-sans">
                   {authView === 'login' ? 'Welcome Back!' : 'Register Account'}
                 </h2>
                 <p className="text-xs text-slate-400">
@@ -2336,7 +2439,7 @@ export default function App() {
             <div className="space-y-6">
               <div className="flex justify-between items-center bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
                 <div>
-                  <h2 className="text-base sm:text-lg font-extrabold text-slate-800 tracking-tight font-sans">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-800 tracking-tight font-sans">
                     Welcome to Dashboard
                   </h2>
                   <p className="text-xs text-slate-400">
@@ -2464,7 +2567,7 @@ export default function App() {
 
                   <button
                     onClick={handleLogout}
-                    className="text-left p-3.5 text-[11px] font-extrabold text-red-650 hover:bg-red-50/50 transition flex items-center gap-3.5"
+                    className="text-left p-3.5 text-[11px] font-bold text-red-650 hover:bg-red-50/50 transition flex items-center gap-3.5"
                   >
                     <LogOut className="w-4 h-4 text-red-500 shrink-0" />
                     <span>Logout Account</span>
@@ -2490,7 +2593,7 @@ export default function App() {
                           </span>
                           <div>
                             <p className="text-[10px] uppercase font-bold text-slate-400">Total Orders</p>
-                            <p className="text-lg font-black text-slate-800">
+                            <p className="text-lg font-bold text-slate-800">
                               {orders.filter((o) => o.customerMobile === user.phone).length}
                             </p>
                           </div>
@@ -2508,7 +2611,7 @@ export default function App() {
                           </span>
                           <div>
                             <p className="text-[10px] uppercase font-bold text-slate-400">In Wishlist</p>
-                            <p className="text-lg font-black text-slate-800">{wishlist.length}</p>
+                            <p className="text-lg font-bold text-slate-800">{wishlist.length}</p>
                           </div>
                         </div>
 
@@ -2524,7 +2627,7 @@ export default function App() {
                           </span>
                           <div>
                             <p className="text-[10px] uppercase font-bold text-slate-400">Total Spent</p>
-                            <p className="text-core font-extrabold text-[#c25927]">
+                            <p className="text-core font-bold text-[#c25927]">
                               {orders.filter((o) => o.customerMobile === user.phone).reduce((sum, o) => sum + o.total, 0).toLocaleString()} AED
                             </p>
                           </div>
@@ -2546,7 +2649,7 @@ export default function App() {
                   {/* 2. Account Details */}
                   {dashboardView === 'account' && (
                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm text-left space-y-4">
-                      <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-50 pb-2">
+                      <h3 className="font-bold text-slate-800 text-sm border-b border-slate-50 pb-2">
                         Profile Credentials Info
                       </h3>
                       {editProfileMessage && (
@@ -2618,7 +2721,7 @@ export default function App() {
                   {dashboardView === 'orders' && (
                     <div className="space-y-4">
                       <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm text-left">
-                        <h2 className="text-2xl font-black text-slate-900 mb-6 font-sans">
+                        <h2 className="text-2xl font-bold text-slate-900 mb-6 font-sans">
                           Orders
                         </h2>
 
@@ -2698,7 +2801,7 @@ export default function App() {
                       if (ord.customerMobile !== user.phone) {
                         return (
                           <div className="text-center py-8 space-y-3">
-                            <p className="font-extrabold text-red-650 text-sm">Access Denied</p>
+                            <p className="font-bold text-red-650 text-sm">Access Denied</p>
                             <p className="text-xs text-slate-550">You do not have permission to view this order record.</p>
                             <button onClick={() => setDashboardView('orders')} className="text-xs font-bold text-[#15803d] underline">
                               Back to My Orders
@@ -2724,7 +2827,7 @@ export default function App() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Customer Information Card */}
                             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm space-y-2">
-                              <h4 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider text-slate-400">
+                              <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider text-slate-400">
                                 Customer Information
                               </h4>
                               <p className="text-xs font-bold text-slate-800">{ord.customerName}</p>
@@ -2733,7 +2836,7 @@ export default function App() {
 
                             {/* Order Technical Meta */}
                             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm space-y-2">
-                              <h4 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider text-slate-400">
+                              <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider text-slate-400">
                                 Order Meta Status
                               </h4>
                               <p className="text-xs">
@@ -2789,13 +2892,13 @@ export default function App() {
                                         <p className="text-[10px] text-slate-400 font-sans">Qty: {quantity} x {product.price} AED</p>
                                       </div>
                                     </div>
-                                    <span className="font-black text-slate-700">{(product.price * quantity).toLocaleString()} AED</span>
+                                    <span className="font-bold text-slate-700">{(product.price * quantity).toLocaleString()} AED</span>
                                   </div>
                                 ))}
                               </div>
                             </div>
 
-                            <div className="border-t border-slate-100 pt-3 flex justify-between font-extrabold text-[#c25927] text-sm">
+                            <div className="border-t border-slate-100 pt-3 flex justify-between font-bold text-[#c25927] text-sm">
                               <span>Grand Total (payable):</span>
                               <span>{ord.total.toLocaleString()} AED</span>
                             </div>
@@ -2827,7 +2930,7 @@ export default function App() {
                   {/* 4. My Wishlist (Representation of Image 1 & 21) */}
                   {dashboardView === 'wishlist' && (
                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm text-left space-y-4">
-                      <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-50 pb-2">
+                      <h3 className="font-bold text-slate-800 text-sm border-b border-slate-50 pb-2">
                         My Bookmarked Furniture Wishlist
                       </h3>
 
@@ -2900,7 +3003,7 @@ export default function App() {
                     <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm text-left text-xs space-y-5">
                       <div className="text-center space-y-1">
                         <MessageSquare className="w-10 h-10 text-[#15803d] mx-auto opacity-75" />
-                        <h3 className="font-extrabold text-slate-800 text-sm">
+                        <h3 className="font-bold text-slate-800 text-sm">
                           Chat with Store Helpdesk
                         </h3>
                         <p className="text-[10px] text-slate-400">
@@ -2924,7 +3027,7 @@ export default function App() {
                           href={storeContact.whatsappUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="bg-[#25D366] hover:bg-[#20ba59] text-white font-extrabold p-2.5 rounded-xl text-center flex items-center justify-center gap-1.5"
+                          className="bg-[#25D366] hover:bg-[#20ba59] text-white font-bold p-2.5 rounded-xl text-center flex items-center justify-center gap-1.5"
                         >
                           {/* Svg whatsapp icon */}
                           <svg className="w-4.5 h-4.5 fill-white" viewBox="0 0 24 24">
@@ -2935,7 +3038,7 @@ export default function App() {
 
                         <a
                           href={`tel:${storeContact.phone}`}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold p-2.5 rounded-xl text-center flex items-center justify-center gap-1"
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded-xl text-center flex items-center justify-center gap-1"
                         >
                           <Phone className="w-4 h-4" />
                           <span>Call Shop Desk</span>
@@ -2948,7 +3051,7 @@ export default function App() {
                   {dashboardView === 'addresses' && (
                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm text-left space-y-4">
                       <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                        <h3 className="font-extrabold text-slate-800 text-sm">
+                        <h3 className="font-bold text-slate-800 text-sm">
                           My Saved Shipping Locations
                         </h3>
                         <button
@@ -2990,7 +3093,7 @@ export default function App() {
                   {/* 7. Password Reset View (Representation of Image 17) */}
                   {dashboardView === 'password_reset' && (
                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm text-left max-w-sm mx-auto space-y-4">
-                      <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-50 pb-2 flex items-center gap-1">
+                      <h3 className="font-bold text-slate-800 text-sm border-b border-slate-50 pb-2 flex items-center gap-1">
                         <Lock className="w-4 h-4 text-emerald-700" />
                         <span>Change Password Security</span>
                       </h3>
@@ -3084,7 +3187,7 @@ export default function App() {
               className="relative w-full max-w-xs bg-white h-full shadow-2xl flex flex-col justify-between"
             >
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5 font-sans">
+                <h3 className="font-bold text-sm text-slate-800 flex items-center gap-1.5 font-sans">
                   <ShoppingCart className="w-4.5 h-4.5 text-[#15803d]" />
                   <span>Shopping Cart</span>
                 </h3>
@@ -3200,7 +3303,7 @@ export default function App() {
                       setCartDrawerOpen(false);
                       setView('checkout');
                     }}
-                    className="w-full bg-[#15803d] disabled:opacity-40 hover:bg-emerald-800 text-white font-extrabold py-2.5 rounded-xl text-center block"
+                    className="w-full bg-[#15803d] disabled:opacity-40 hover:bg-emerald-800 text-white font-bold py-2.5 rounded-xl text-center block"
                   >
                     Proceed to Checkout
                   </button>
@@ -3283,7 +3386,7 @@ export default function App() {
                     <p className="text-[10px] text-slate-450 font-bold">
                       Quantity: {itemQty}
                     </p>
-                    <p className="font-black text-[#15803d] text-xs sm:text-sm">
+                    <p className="font-bold text-[#15803d] text-xs sm:text-sm">
                       {currentPrice.toLocaleString()} AED / {currentPrice.toLocaleString()} د.إ
                     </p>
                   </div>
@@ -3296,7 +3399,7 @@ export default function App() {
                       setAddedProductPopup(null);
                       setCartDrawerOpen(true);
                     }}
-                    className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-xs sm:text-sm py-2.5 rounded-lg transition text-center focus:outline-none cursor-pointer"
+                    className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm py-2.5 rounded-lg transition text-center focus:outline-none cursor-pointer"
                   >
                     View Cart ({totalCartItems})
                   </button>
@@ -3306,7 +3409,7 @@ export default function App() {
                       setAddedProductPopup(null);
                       setView('checkout');
                     }}
-                    className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm py-2.5 rounded-lg transition shadow-sm text-center focus:outline-none cursor-pointer"
+                    className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm py-2.5 rounded-lg transition shadow-sm text-center focus:outline-none cursor-pointer"
                   >
                     Buy Now
                   </button>
@@ -3348,7 +3451,7 @@ export default function App() {
             >
               {/* Header */}
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-extrabold text-[#111827] text-base font-sans select-none">
+                <h3 className="font-bold text-[#111827] text-base font-sans select-none">
                   Categories
                 </h3>
                 <button
@@ -3376,7 +3479,7 @@ export default function App() {
                       }}
                       className={`w-full text-left py-3 px-5 transition flex items-center gap-3.5 cursor-pointer hover:bg-slate-50/80 focus:outline-none ${
                         isSelected 
-                          ? 'bg-amber-500/10 text-amber-600 font-extrabold' 
+                          ? 'bg-amber-500/10 text-amber-600 font-bold' 
                           : 'bg-white text-slate-800'
                       }`}
                     >
@@ -3420,7 +3523,7 @@ export default function App() {
               className="relative w-64 bg-white h-full shadow-2xl flex flex-col justify-between py-6"
             >
               <div className="px-6 pb-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-extrabold text-sm text-slate-800">Dashboard Menu</h3>
+                <h3 className="font-bold text-sm text-slate-800">Dashboard Menu</h3>
                 <button onClick={() => setDashboardDrawerOpen(false)} className="text-slate-400">
                   <X className="w-5 h-5" />
                 </button>
@@ -3502,7 +3605,7 @@ export default function App() {
               <div className="px-6 pt-4 border-t border-slate-100">
                 <button
                   onClick={() => { handleLogout(); setDashboardDrawerOpen(false); }}
-                  className="w-full hover:bg-red-50 text-red-600 font-extrabold text-xs py-2.5 rounded-lg transition flex items-center justify-center gap-2 border border-red-200"
+                  className="w-full hover:bg-red-50 text-red-600 font-bold text-xs py-2.5 rounded-lg transition flex items-center justify-center gap-2 border border-red-200"
                 >
                   <LogOut className="w-4 h-4 text-red-500 shrink-0" />
                   <span>Logout</span>
@@ -3521,7 +3624,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.6 }}
               exit={{ opacity: 0 }}
-              onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+              onClick={() => { setSearchOpen(false); setSearchQuery(''); setIsSearching(false); }}
               className="absolute inset-0 bg-slate-900"
             />
 
@@ -3529,16 +3632,16 @@ export default function App() {
               initial={{ y: -15, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -15, opacity: 0 }}
-              className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4 text-left border border-slate-100"
+              className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4 text-left border border-slate-100 font-sans"
             >
               {/* Header */}
               <div className="flex items-center justify-between pb-1 relative">
-                <div className="w-5"></div> {/* spacer helper */}
-                <h3 className="font-extrabold text-[#111827] text-lg sm:text-xl font-sans text-center flex-grow">
+                <div className="w-5"></div>
+                <h3 className="font-bold text-[#111827] text-lg sm:text-xl text-center flex-grow">
                   Search Products
                 </h3>
                 <button
-                  onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                  onClick={() => { setSearchOpen(false); setSearchQuery(''); setIsSearching(false); }}
                   className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-0.5"
                 >
                   <X className="w-5 h-5" />
@@ -3546,16 +3649,51 @@ export default function App() {
               </div>
 
               {/* Input Group */}
-              <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
+              <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white relative">
                 <input
                   type="text"
                   autoFocus
                   placeholder="Search entire store here..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-grow px-4 py-3 text-sm focus:outline-none text-slate-800 font-sans"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchQuery(val);
+                    if (val.trim()) {
+                      setIsSearching(true);
+                      if (searchTimeoutRef.current) {
+                        clearTimeout(searchTimeoutRef.current);
+                      }
+                      searchTimeoutRef.current = setTimeout(() => {
+                        setIsSearching(false);
+                      }, 350);
+                    } else {
+                      setIsSearching(false);
+                    }
+                  }}
+                  className="flex-grow px-4 py-3 text-sm focus:outline-none text-slate-800 pr-10"
                 />
+                
+                {searchQuery && (
+                  <button 
+                    onClick={() => { setSearchQuery(''); setIsSearching(false); }}
+                    className="absolute right-16 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer focus:outline-none"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+
                 <button
+                  onClick={() => {
+                    if (searchQuery.trim()) {
+                      const term = searchQuery.trim();
+                      setRecentSearches(prev => {
+                        const filtered = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
+                        const updated = [term, ...filtered].slice(0, 5);
+                        localStorage.setItem('rk_recent_searches', JSON.stringify(updated));
+                        return updated;
+                      });
+                    }
+                  }}
                   className="bg-[#15803d] hover:bg-emerald-800 px-5 flex items-center justify-center text-white transition-colors cursor-pointer"
                   id="btn-search-apply"
                 >
@@ -3563,68 +3701,134 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Results context / search matches */}
-              {searchQuery && (
-                (() => {
-                  const filtered = products.filter((p) =>
-                    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    p.category.toLowerCase().includes(searchQuery.toLowerCase())
-                  );
-
-                  return (
+              {/* Loader, Recents or Results matches */}
+              {isSearching ? (
+                <div className="py-12 flex flex-col items-center justify-center space-y-3">
+                  <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm text-slate-400">Searching...</p>
+                </div>
+              ) : searchQuery.trim() === '' ? (
+                /* Recent Searches Block */
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-900">Recent Searches</span>
+                    {recentSearches.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setRecentSearches([]);
+                          localStorage.removeItem('rk_recent_searches');
+                        }}
+                        className="text-[#c25927] hover:underline font-bold transition-colors cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+                  {recentSearches.length === 0 ? (
+                    <p className="text-xs text-slate-400">No recent searches</p>
+                  ) : (
                     <div className="space-y-2">
-                      <h4 className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                        Search Matches ({filtered.length})
-                      </h4>
-                      {filtered.length === 0 ? (
-                        <p className="text-xs text-slate-400 py-4 text-center">No matching accessories or furniture found.</p>
-                      ) : (
-                        <div className="divide-y divide-slate-50 space-y-2 max-h-56 overflow-y-auto pr-1">
-                          {filtered.map((prod) => (
-                            <div
-                              key={prod.id}
-                              onClick={() => {
-                                setSelectedProductId(prod.id);
-                                setView('product_detail');
-                                setSearchOpen(false);
-                                setSearchQuery('');
-                              }}
-                              className="flex gap-2.5 items-center p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-xs"
-                            >
-                              {prod.image === 'placeholder_box' ? (
-                                <div className="w-10 h-10 rounded bg-slate-50 flex items-center justify-center shrink-0 border">
-                                  <BoxWithRays className="w-8 h-8 text-slate-800" />
-                                </div>
-                              ) : (
-                                <img src={prod.image} className="w-10 h-10 rounded object-cover border shrink-0" referrerPolicy="no-referrer" />
-                              )}
-                              <div className="text-left flex-1">
-                                <p className="font-bold text-slate-850">{prod.name}</p>
-                                {(() => {
-                                  const { currentPrice, oldPrice } = getProductPrices(prod);
-                                  return (
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className="text-[#c25927] font-semibold">
-                                        {currentPrice.toLocaleString()} AED
-                                      </span>
-                                      {oldPrice && (
-                                        <span className="text-slate-405 line-through text-[10px] font-normal">
-                                          {oldPrice.toLocaleString()} AED
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                              <ChevronRight className="w-4 h-4 text-slate-400" />
-                            </div>
-                          ))}
+                      {recentSearches.map((term, index) => (
+                        <div
+                          key={index}
+                          onClick={() => {
+                            setSearchQuery(term);
+                            setIsSearching(true);
+                            if (searchTimeoutRef.current) {
+                              clearTimeout(searchTimeoutRef.current);
+                            }
+                            searchTimeoutRef.current = setTimeout(() => {
+                              setIsSearching(false);
+                            }, 300);
+                          }}
+                          className="flex items-center gap-2.5 p-1 rounded hover:bg-slate-50 cursor-pointer text-xs text-slate-700 transition"
+                        >
+                          <Clock className="w-4 h-4 text-slate-350 shrink-0" />
+                          <span>{term}</span>
                         </div>
-                      )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (() => {
+                const filtered = products.filter((p) =>
+                  p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  p.category.toLowerCase().includes(searchQuery.toLowerCase())
+                );
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-2">
+                      <Search className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+                      <p className="text-sm">No Results Found</p>
                     </div>
                   );
-                })()
-              )}
+                }
+
+                return (
+                  <div className="space-y-2.5">
+                    <h4 className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                      SEARCH MATCHES ({filtered.length})
+                    </h4>
+                    
+                    <div className="divide-y divide-slate-100 space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {filtered.map((prod) => (
+                        <div
+                          key={prod.id}
+                          onClick={() => {
+                            // Add query to recent searches
+                            const term = searchQuery.trim();
+                            if (term) {
+                              setRecentSearches(prev => {
+                                const filteredTerms = prev.filter(t => t.toLowerCase() !== term.toLowerCase());
+                                const updated = [term, ...filteredTerms].slice(0, 5);
+                                localStorage.setItem('rk_recent_searches', JSON.stringify(updated));
+                                return updated;
+                              });
+                            }
+                            setSelectedProductId(prod.id);
+                            setView('product_detail');
+                            setSearchOpen(false);
+                            setSearchQuery('');
+                          }}
+                          className="flex gap-3 items-center p-2 rounded-xl hover:bg-slate-50 cursor-pointer transition"
+                        >
+                          {prod.image === 'placeholder_box' ? (
+                            <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
+                              <BoxWithRays className="w-8 h-8 text-slate-400" />
+                            </div>
+                          ) : (
+                            <img 
+                              src={prod.image} 
+                              className="w-12 h-12 rounded-lg object-cover border border-slate-100 shrink-0" 
+                              referrerPolicy="no-referrer" 
+                            />
+                          )}
+                          <div className="text-left flex-1">
+                            <p className="font-bold text-slate-800 text-xs sm:text-xs line-clamp-1">{prod.name}</p>
+                            {(() => {
+                              const { currentPrice, oldPrice } = getProductPrices(prod);
+                              return (
+                                <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-mono mt-0.5">
+                                  <span className="text-[#c25927] font-bold">
+                                    {currentPrice.toLocaleString()} AED
+                                  </span>
+                                  {oldPrice && (
+                                    <span className="text-slate-400 line-through text-[10px] font-normal">
+                                      {oldPrice.toLocaleString()} AED
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </motion.div>
           </div>
         )}
@@ -3640,7 +3844,7 @@ export default function App() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl relative border border-slate-100"
             >
-              <h3 className="text-base font-extrabold text-slate-800 border-b border-slate-100 pb-2 mb-3 text-left">
+              <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 mb-3 text-left">
                 Add Shipping Destination
               </h3>
 

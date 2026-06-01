@@ -355,7 +355,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     e.preventDefault();
     const uploadedImages = prodImages.filter((img) => img !== '');
     if (uploadedImages.length < 4) {
-      showToast('অনুগ্রহ করে কমপক্ষে ৪টি ছবি আপলোড করুন!', 'error');
+      showToast('Please upload at least 4 images!', 'error');
       return;
     }
     const cleanImg = uploadedImages[0];
@@ -404,7 +404,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
     const uploadedImages = prodImages.filter((img) => img !== '');
     if (uploadedImages.length < 4) {
-      showToast('অনুগ্রহ করে কমপক্ষে ৪টি ছবি আপলোড করুন!', 'error');
+      showToast('Please upload at least 4 images!', 'error');
       return;
     }
 
@@ -506,7 +506,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       return;
     }
     if (!catImage) {
-      showToast('অনুগ্রহ করে ক্যাটাগরি কভার ছবি আপলোড করুন!', 'error');
+      showToast('Please upload a category cover image!', 'error');
       return;
     }
     const slug = catName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
@@ -601,7 +601,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const deleteProduct = (productId: string) => {
     const originalProducts = [...products];
     setProducts(prev => prev.filter(p => p.id !== productId));
-    showToast('প্রোডাক্টটি এক ক্লিকে সফলভাবে ডিলিট করা হয়েছে!', 'success');
+    showToast('Product deleted successfully!', 'success');
 
     fetch(`/api/products/${productId}`, {
       method: 'DELETE'
@@ -620,7 +620,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const handleAddNewCoupon = (e: React.FormEvent) => {
     e.preventDefault();
     if (!couponCode) {
-      showToast('অনুগ্রহ করে কোড টাইপ করুন!', 'error');
+      showToast('Please type a coupon code!', 'error');
       return;
     }
     const newCoupon = {
@@ -642,7 +642,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         setCouponPercent(10);
         setCouponDesc('');
         fetchAllData();
-        showToast('নতুন কোপন কোড সফলভাবে যুক্ত করা হয়েছে!', 'success');
+        showToast('New coupon code added successfully!', 'success');
       })
       .catch((err) => {
         console.error('Failed to add coupon:', err);
@@ -656,7 +656,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     })
       .then(() => {
         fetchAllData();
-        showToast('কোপন কোডটি সফলভাবে ডিলিট করা হয়েছে!', 'success');
+        showToast('Coupon code deleted successfully!', 'success');
       })
       .catch((err) => {
         console.error('Failed to delete coupon:', err);
@@ -837,8 +837,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               </div>
             </div>
             <div className="space-y-1">
-              <h2 className="text-lg font-black text-slate-900 tracking-tight uppercase leading-none">RK Furniture Hub</h2>
-              <p className="text-[9px] uppercase tracking-widest text-[#15803d] font-extrabold">Admin Core System</p>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight uppercase leading-none">RK Furniture Hub</h2>
+              <p className="text-[9px] uppercase tracking-widest text-[#15803d] font-bold">Admin Core System</p>
             </div>
           </div>
 
@@ -850,7 +850,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               Syncing live databases with Google Firestore...
             </p>
             <div className="space-y-2">
-              <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase font-mono">
+              <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase font-mono">
                 <span>Products Catalog</span>
                 <span className="text-[#15803d] animate-pulse">Connecting...</span>
               </div>
@@ -860,7 +860,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
             </div>
             <div className="flex items-center justify-center gap-1.5 pt-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-              <span className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">Establishing security token</span>
+              <span className="text-[9px] text-slate-400 font-bold uppercase font-mono tracking-wider">Establishing security token</span>
             </div>
           </div>
         </div>
@@ -932,7 +932,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
           </button>
           <button 
             onClick={onLogout}
-            className="bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs py-2 px-4 rounded-lg flex items-center gap-2 transition focus:outline-none"
+            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center gap-2 transition focus:outline-none"
           >
             <LogOut className="w-4 h-4" />
             <span>Sign Out</span>
@@ -978,7 +978,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 }}
                 className={`px-3 py-1 text-[10px] sm:text-xs font-bold rounded-lg leading-none select-none transition-all cursor-pointer border ${
                   orderDateFilter === 'custom' 
-                    ? 'bg-amber-500 text-slate-950 border-amber-500 font-extrabold shadow-lg shadow-amber-500/20' 
+                    ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-lg shadow-amber-500/20' 
                     : 'bg-white border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
@@ -992,7 +992,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 }}
                 className={`px-3 py-1 text-[10px] sm:text-xs font-bold rounded-lg leading-none select-none transition-all cursor-pointer border ${
                   orderDateFilter === 'today' 
-                    ? 'bg-amber-500 text-slate-950 border-amber-500 font-extrabold shadow-lg shadow-amber-500/20' 
+                    ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-lg shadow-amber-500/20' 
                     : 'bg-white border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
@@ -1026,8 +1026,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-pink-200/50 to-pink-100/10 rounded-full translate-x-6 -translate-y-6 pointer-events-none" />
               <div className="flex justify-between items-start">
                 <div className="grow pr-2 text-left">
-                  <p className="text-[10px] sm:text-[11px] font-black text-pink-700 uppercase tracking-tight">Today Orders: {todayOrdersCount}</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
+                  <p className="text-[10px] sm:text-[11px] font-bold text-pink-700 uppercase tracking-tight">Today Orders: {todayOrdersCount}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 font-mono mt-1">
                     {todayOrdersRevenue.toLocaleString()} AED
                   </p>
                 </div>
@@ -1055,8 +1055,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-purple-200/50 to-purple-100/10 rounded-full translate-x-6 -translate-y-6 pointer-events-none" />
               <div className="flex justify-between items-start">
                 <div className="grow pr-2 text-left">
-                  <p className="text-[10px] sm:text-[11px] font-black text-purple-700 uppercase tracking-tight">Today Courier Orders: {todayCourierCount}</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
+                  <p className="text-[10px] sm:text-[11px] font-bold text-purple-700 uppercase tracking-tight">Today Courier Orders: {todayCourierCount}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 font-mono mt-1">
                     {todayCourierRevenue.toLocaleString()} AED
                   </p>
                 </div>
@@ -1084,8 +1084,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-emerald-200/50 to-emerald-100/10 rounded-full translate-x-6 -translate-y-6 pointer-events-none" />
               <div className="flex justify-between items-start">
                 <div className="grow pr-2 text-left">
-                  <p className="text-[10px] sm:text-[11px] font-black text-emerald-700 uppercase tracking-tight">Confirmed Orders: {confirmedCount}</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
+                  <p className="text-[10px] sm:text-[11px] font-bold text-emerald-700 uppercase tracking-tight">Confirmed Orders: {confirmedCount}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 font-mono mt-1">
                     {confirmedRevenue.toLocaleString()} AED
                   </p>
                 </div>
@@ -1113,8 +1113,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-indigo-200/50 to-indigo-100/10 rounded-full translate-x-6 -translate-y-6 pointer-events-none" />
               <div className="flex justify-between items-start">
                 <div className="grow pr-2 text-left">
-                  <p className="text-[10px] sm:text-[11px] font-black text-indigo-700 uppercase tracking-tight">Pending Orders: {pendingCount}</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
+                  <p className="text-[10px] sm:text-[11px] font-bold text-indigo-700 uppercase tracking-tight">Pending Orders: {pendingCount}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 font-mono mt-1">
                     {pendingRevenue.toLocaleString()} AED
                   </p>
                 </div>
@@ -1142,8 +1142,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-orange-200/50 to-orange-100/10 rounded-full translate-x-6 -translate-y-6 pointer-events-none" />
               <div className="flex justify-between items-start">
                 <div className="grow pr-2 text-left">
-                  <p className="text-[10px] sm:text-[11px] font-black text-orange-700 uppercase tracking-tight">Hold Orders: {holdOrdersCount}</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
+                  <p className="text-[10px] sm:text-[11px] font-bold text-orange-700 uppercase tracking-tight">Hold Orders: {holdOrdersCount}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 font-mono mt-1">
                     {holdRevenue.toLocaleString()} AED
                   </p>
                 </div>
@@ -1171,8 +1171,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-cyan-200/50 to-cyan-100/10 rounded-full translate-x-6 -translate-y-6 pointer-events-none" />
               <div className="flex justify-between items-start">
                 <div className="grow pr-2 text-left">
-                  <p className="text-[10px] sm:text-[11px] font-black text-cyan-700 uppercase tracking-tight">Cancelled Orders: {cancelledOrdersCount}</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
+                  <p className="text-[10px] sm:text-[11px] font-bold text-cyan-700 uppercase tracking-tight">Cancelled Orders: {cancelledOrdersCount}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 font-mono mt-1">
                     {cancelledRevenue.toLocaleString()} AED
                   </p>
                 </div>
@@ -1181,12 +1181,12 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   <X className="w-5 h-5 text-cyan-600 z-10" />
                 </div>
               </div>
-              <div className="flex justify-between items-center text-[10px] sm:text-xs text-cyan-600 font-extrabold">
+              <div className="flex justify-between items-center text-[10px] sm:text-xs text-cyan-600 font-bold">
                 <div className="flex items-center gap-1">
                   <X className="w-3.5 h-3.5" />
                   <span>Cancelled list</span>
                 </div>
-                <span className="bg-slate-400/80 text-white font-black text-[9px] px-2 py-0.5 rounded-full z-10 select-none">
+                <span className="bg-slate-400/80 text-white font-bold text-[9px] px-2 py-0.5 rounded-full z-10 select-none">
                   {cancelRate || 0}% Cancel Rate
                 </span>
               </div>
@@ -1212,7 +1212,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-sky-300/60" />
                 <ClipboardList className="w-5 h-5 text-sky-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Orders Queue</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Orders Queue</span>
               <span className="text-[8px] sm:text-[9px] text-sky-700 font-bold block mt-0.5 font-mono">Total: {orders.length}</span>
             </button>
 
@@ -1228,7 +1228,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-amber-300/60" />
                 <Box className="w-5 h-5 text-amber-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">All Products</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">All Products</span>
               <span className="text-[8px] sm:text-[9px] text-amber-700 font-bold block mt-0.5 font-mono">Items: {products.length}</span>
             </button>
 
@@ -1254,7 +1254,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-emerald-300/60" />
                 <Plus className="w-5 h-5 text-emerald-600 z-10 font-bold" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Add Product</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Add Product</span>
               <span className="text-[8px] sm:text-[9px] text-emerald-700 font-bold block mt-0.5 font-mono">New Upload</span>
             </button>
 
@@ -1270,7 +1270,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-indigo-300/60" />
                 <Tags className="w-5 h-5 text-indigo-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Categories</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Categories</span>
               <span className="text-[8px] sm:text-[9px] text-indigo-700 font-bold block mt-0.5 font-mono">Groups: {localCategories.length}</span>
             </button>
 
@@ -1286,7 +1286,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-purple-300/60" />
                 <Laptop className="w-5 h-5 text-purple-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Slide Banners</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Slide Banners</span>
               <span className="text-[8px] sm:text-[9px] text-purple-700 font-bold block mt-0.5 font-mono">Banners {localSlides.length}</span>
             </button>
 
@@ -1302,7 +1302,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-cyan-300/60" />
                 <Users className="w-5 h-5 text-cyan-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Viewers List</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Viewers List</span>
               <span className="text-[8px] sm:text-[9px] text-cyan-700 font-bold block mt-0.5 font-mono">Active {activeSessions.length}</span>
             </button>
 
@@ -1318,7 +1318,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-pink-300/60" />
                 <Lock className="w-5 h-5 text-pink-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Settings Code</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Settings Code</span>
               <span className="text-[8px] sm:text-[9px] text-pink-700 font-bold block mt-0.5 font-mono">Key Settings</span>
             </button>
 
@@ -1334,7 +1334,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-amber-300/60" />
                 <Truck className="w-5 h-5 text-amber-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Shipping Zones</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Shipping Zones</span>
               <span className="text-[8px] sm:text-[9px] text-amber-700 font-bold block mt-0.5 font-mono">Zones {shippingAreas.length}</span>
             </button>
 
@@ -1350,7 +1350,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-emerald-300/60" />
                 <MessageCircle className="w-5 h-5 text-emerald-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Chat Help Desk</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Chat Help Desk</span>
               <span className="text-[8px] sm:text-[9px] text-emerald-700 font-bold block mt-0.5 font-mono">Direct Support</span>
             </button>
 
@@ -1366,7 +1366,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-violet-300/60" />
                 <Ticket className="w-5 h-5 text-violet-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Coupons List</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Coupons List</span>
               <span className="text-[8px] sm:text-[9px] text-violet-700 font-bold block mt-0.5 font-mono">Total {couponsList.length}</span>
             </button>
           </div>
@@ -1383,7 +1383,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
           {activeTab !== 'products' && activeTab !== null && (
             <div className="flex items-center gap-2.5 pb-3.5 mb-5 border-b border-slate-200 text-left">
               <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-              <span className="text-sm font-black uppercase tracking-wider text-slate-800 font-sans">
+              <span className="text-sm font-bold uppercase tracking-wider text-slate-800 font-sans">
                 {activeTab === 'orders' && 'Orders Management'}
                 {activeTab === 'sessions' && 'Viewers List'}
                 {activeTab === 'hero_banner' && 'Slide Banners'}
@@ -1409,7 +1409,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 </span>
               </div>
               <div className="space-y-2 max-w-md">
-                <h3 className="text-base sm:text-lg font-black text-slate-850 tracking-tight uppercase font-sans">
+                <h3 className="text-base sm:text-lg font-bold text-slate-850 tracking-tight uppercase font-sans">
                   RK Management Core Online
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed font-semibold">
@@ -1427,15 +1427,15 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="grid grid-cols-3 gap-3.5 w-full max-w-lg pt-4">
                 <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-xs text-center font-sans">
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">PRODUCTS</p>
-                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{products.length}</p>
+                  <p className="text-base font-bold text-slate-800 font-mono mt-0.5">{products.length}</p>
                 </div>
                 <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-xs text-center font-sans">
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">ORDERS</p>
-                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{orders.length}</p>
+                  <p className="text-base font-bold text-slate-800 font-mono mt-0.5">{orders.length}</p>
                 </div>
                 <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-xs text-center font-sans">
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">COUPONS</p>
-                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{couponsList.length}</p>
+                  <p className="text-base font-bold text-slate-800 font-mono mt-0.5">{couponsList.length}</p>
                 </div>
               </div>
             </div>
@@ -1497,8 +1497,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                           <div className="text-left">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-amber-600 font-mono tracking-wider">{ord.id}</span>
-                              <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${statusColors[ord.status] || ''}`}>
+                              <span className="text-xs font-bold text-amber-600 font-mono tracking-wider">{ord.id}</span>
+                              <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${statusColors[ord.status] || ''}`}>
                                 {ord.status}
                               </span>
                             </div>
@@ -1525,7 +1525,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-200 pt-3 text-[11px] text-left">
                           <div>
                             <span className="text-slate-500 block font-bold mb-0.5">Purchaser Info</span>
-                            <span className="font-extrabold text-slate-800">{ord.customerName}</span>
+                            <span className="font-bold text-slate-800">{ord.customerName}</span>
                             <span className="text-slate-600 block mt-0.5 font-mono">{ord.customerMobile}</span>
                           </div>
                           
@@ -1593,7 +1593,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 mb-2">
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full bg-[#ff9900]" />
-                  <h3 className="text-sm sm:text-base font-black text-[#1e293b] tracking-wider font-sans uppercase">
+                  <h3 className="text-sm sm:text-base font-bold text-[#1e293b] tracking-wider font-sans uppercase">
                     PRODUCTS INVENTORY
                   </h3>
                 </div>
@@ -1612,9 +1612,9 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     setProdIsTrending(false);
                     showToast('Publish drawer opened. Fill in details to publish!', 'info');
                   }}
-                  className="bg-[#ff9900] hover:bg-amber-500 text-black text-xs font-black py-2.5 px-4 rounded-xl flex items-center justify-center gap-1 transition duration-150 active:scale-95 cursor-pointer focus:outline-none"
+                  className="bg-[#ff9900] hover:bg-amber-500 text-black text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1 transition duration-150 active:scale-95 cursor-pointer focus:outline-none"
                 >
-                  <span className="text-sm font-black text-black">+</span>
+                  <span className="text-sm font-bold text-black">+</span>
                   <span>Add Product</span>
                 </button>
               </div>
@@ -1653,8 +1653,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     <div className="text-left flex-1 flex flex-col justify-between min-w-0">
                       <div className="space-y-1">
                         <div className="flex items-start justify-between gap-1.5">
-                          <h4 className="text-xs sm:text-sm font-black text-slate-900 line-clamp-1 py-0.5">{prod.name}</h4>
-                          <span className="bg-emerald-50 text-[9px] font-black tracking-tight text-emerald-700 border border-emerald-100/60 rounded-lg px-2 py-0.5 shrink-0 select-none">
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-1 py-0.5">{prod.name}</h4>
+                          <span className="bg-emerald-50 text-[9px] font-bold tracking-tight text-emerald-700 border border-emerald-100/60 rounded-lg px-2 py-0.5 shrink-0 select-none">
                             {prod.category}
                           </span>
                         </div>
@@ -1670,7 +1670,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                       <div className="flex items-center justify-between border-t border-slate-100/80 pt-2 mt-2">
                         <div>
                           {prod.isTrending && (
-                            <span className="inline-block bg-orange-50 text-[#f59e0b] border border-orange-100/60 text-[9px] font-extrabold px-2 py-0.5 rounded-md select-none uppercase">
+                            <span className="inline-block bg-orange-50 text-[#f59e0b] border border-orange-100/60 text-[9px] font-bold px-2 py-0.5 rounded-md select-none uppercase">
                               Trending
                             </span>
                           )}
@@ -1699,13 +1699,13 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                               
                               setProdIsTrending(!!prod.isTrending);
                             }}
-                            className="px-2.5 py-1.5 border border-slate-150 bg-[#f8fafc] hover:bg-slate-100 rounded-lg text-slate-700 hover:text-slate-900 transition text-[10px] font-black cursor-pointer shadow-sm focus:outline-none"
+                            className="px-2.5 py-1.5 border border-slate-150 bg-[#f8fafc] hover:bg-slate-100 rounded-lg text-slate-700 hover:text-slate-900 transition text-[10px] font-bold cursor-pointer shadow-sm focus:outline-none"
                           >
                             Edit
                           </button>
                           <button 
                             onClick={() => deleteProduct(prod.id)}
-                            className="px-2.5 py-1.5 border border-red-100 bg-red-50/50 hover:bg-red-50 rounded-lg text-red-600 hover:text-red-700 transition text-[10px] font-black cursor-pointer shadow-sm focus:outline-none"
+                            className="px-2.5 py-1.5 border border-red-100 bg-red-50/50 hover:bg-red-50 rounded-lg text-red-600 hover:text-red-700 transition text-[10px] font-bold cursor-pointer shadow-sm focus:outline-none"
                           >
                             Delete
                           </button>
@@ -1745,9 +1745,9 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-extrabold text-slate-800">{sess.deviceName}</span>
+                              <span className="font-bold text-slate-800">{sess.deviceName}</span>
                               {isSelf && (
-                                <span className="bg-amber-500 text-slate-950 font-black text-[8px] px-1.5 rounded">YOU / ADMIN</span>
+                                <span className="bg-amber-500 text-slate-950 font-bold text-[8px] px-1.5 rounded">YOU / ADMIN</span>
                               )}
                               {sess.isAdmin && !isSelf && (
                                 <span className="bg-[#15803d] text-white font-bold text-[8px] px-1.5 rounded border border-emerald-500">ADMIN</span>
@@ -1789,7 +1789,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     setSlideSubtitle('');
                     setSlideBg('');
                   }}
-                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs py-2 px-3.5 rounded-lg flex items-center gap-1.5 focus:outline-none cursor-pointer"
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs py-2 px-3.5 rounded-lg flex items-center gap-1.5 focus:outline-none cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add New Slider</span>
@@ -1800,7 +1800,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               {(isAddingSlide || editingSlide) && (
                 <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-4 text-left animate-fade-in">
                   <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                    <span className="font-extrabold text-xs text-amber-650 uppercase tracking-wider">
+                    <span className="font-bold text-xs text-amber-650 uppercase tracking-wider">
                       {isAddingSlide ? 'Create Dynamic Slide Banner' : 'Edit Slide Banner'}
                     </span>
                     <button
@@ -1818,34 +1818,12 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   </div>
 
                   <form onSubmit={isAddingSlide ? handleAddNewSlideSubmit : handleUpdateSlideSubmit} className="space-y-4 text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="font-bold text-slate-500 block">Slide Heading Title *</label>
-                        <input
-                          type="text"
-                          required
-                          value={slideTitle}
-                          onChange={(e) => setSlideTitle(e.target.value)}
-                          placeholder="e.g. Handmade Segun Wood Beds"
-                          className="w-full bg-white border border-slate-300 rounded p-2 text-slate-800 focus:outline-none"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="font-bold text-slate-500 block">Slide Subtitle Description *</label>
-                        <input
-                          type="text"
-                          required
-                          value={slideSubtitle}
-                          onChange={(e) => setSlideSubtitle(e.target.value)}
-                          placeholder="e.g. Elevate your living space with our premium handpicked designs."
-                          className="w-full bg-white border border-slate-300 rounded p-2 text-slate-800"
-                        />
-                      </div>
-                    </div>
-
                     <div className="space-y-1 bg-white p-3 rounded-lg border border-slate-200">
-                      <label className="font-bold text-slate-500 block mb-1">Upload Slide Banner Image * (Select image file from your device gallery)</label>
+                      <label className="font-bold text-slate-500 block mb-1.5">Upload Slide Banner Image * (Select image file from your device gallery)</label>
+                      
+                      <div className="bg-amber-50 border border-amber-200/60 rounded-lg p-2.5 mb-3 text-[10.5px] text-amber-850 leading-relaxed font-sans font-medium">
+                        ★ <span className="font-bold">Recommended Slider Size:</span> 1200 x 500 pixels (or a similar landscape aspect ratio) for best display clarity on both mobile and desktop screens.
+                      </div>
                       <div className="flex items-center gap-3">
                         <input
                           type="file"
@@ -1864,7 +1842,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                         />
                         <label
                           htmlFor="slide-bg-upload"
-                          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-3 py-2 rounded cursor-pointer text-[10px] uppercase tracking-wide shrink-0"
+                          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-2 rounded cursor-pointer text-[10px] uppercase tracking-wide shrink-0"
                         >
                           Choose Banner Image
                         </label>
@@ -1888,7 +1866,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
                     <button
                       type="submit"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold w-full py-2.5 rounded-lg text-xs uppercase tracking-wide transition-colors cursor-pointer"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold w-full py-2.5 rounded-lg text-xs uppercase tracking-wide transition-colors cursor-pointer"
                     >
                       {isAddingSlide ? 'Publish Slider Banner' : 'Apply Layout Updates'}
                     </button>
@@ -1912,11 +1890,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                         </span>
                       </div>
                       <div className="p-3 text-left flex-1 flex flex-col justify-between">
-                        <div className="space-y-1 mb-3">
-                          <h4 className="font-bold text-slate-900 text-xs line-clamp-1">{slide.title}</h4>
-                          <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">{slide.subtitle}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-2.5">
+                        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2.5">
                           <button
                             onClick={() => {
                               setEditingSlide(slide);
@@ -1959,7 +1933,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     setCatName('');
                     setCatImage('');
                   }}
-                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs py-2 px-3.5 rounded-lg flex items-center gap-1.5 focus:outline-none cursor-pointer"
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs py-2 px-3.5 rounded-lg flex items-center gap-1.5 focus:outline-none cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Create Category</span>
@@ -1970,7 +1944,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               {isAddingCategory && (
                 <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-4 text-left animate-fade-in">
                   <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                    <span className="font-extrabold text-xs text-amber-650 uppercase tracking-wider">
+                    <span className="font-bold text-xs text-amber-650 uppercase tracking-wider">
                       Create Dynamic Category
                     </span>
                     <button
@@ -2016,7 +1990,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                         />
                         <label
                           htmlFor="category-img-upload"
-                          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-3 py-2 rounded cursor-pointer text-[10px] uppercase tracking-wide shrink-0 transition-colors"
+                          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-2 rounded cursor-pointer text-[10px] uppercase tracking-wide shrink-0 transition-colors"
                         >
                           Choose Gallery Image
                         </label>
@@ -2040,7 +2014,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
                     <button
                       type="submit"
-                      className="bg-emerald-600 hover:bg-emerald-750 text-white font-extrabold w-full py-2.5 rounded-lg text-xs uppercase tracking-wide transition-colors cursor-pointer"
+                      className="bg-emerald-600 hover:bg-emerald-750 text-white font-bold w-full py-2.5 rounded-lg text-xs uppercase tracking-wide transition-colors cursor-pointer"
                     >
                       Publish Category to Store
                     </button>
@@ -2056,7 +2030,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                       <img src={cat.image} className="w-full h-20 object-cover opacity-90" alt={cat.name} referrerPolicy="no-referrer" />
                     </div>
                     <div className="p-3">
-                      <span className="font-extrabold text-slate-900 text-xs block truncate" title={cat.name}>{cat.name}</span>
+                      <span className="font-bold text-slate-900 text-xs block truncate" title={cat.name}>{cat.name}</span>
                       <button 
                         onClick={() => handleDeleteCategory(cat.id)}
                         className="text-[10px] font-bold text-rose-600 hover:text-rose-700 mt-2 flex items-center gap-1 focus:outline-none cursor-pointer"
@@ -2112,7 +2086,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
                 <button 
                   type="submit"
-                  className="bg-amber-500 hover:bg-amber-600 font-extrabold text-[#111827] text-xs py-2 px-4 rounded transition-all focus:outline-none cursor-pointer"
+                  className="bg-amber-500 hover:bg-amber-600 font-bold text-[#111827] text-xs py-2 px-4 rounded transition-all focus:outline-none cursor-pointer"
                 >
                   Change Password
                 </button>
@@ -2125,7 +2099,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
             <div className="space-y-6 text-left">
               <div className="flex justify-between items-center pb-3 border-b border-slate-100">
                 <div>
-                  <h3 className="font-extrabold text-slate-800 text-base">All Shipping Areas & Charges</h3>
+                  <h3 className="font-bold text-slate-800 text-base">All Shipping Areas & Charges</h3>
                   <p className="text-xs text-slate-400">Configure regional shipping and delivery charges in AED</p>
                 </div>
                 {!isAddingShippingArea && !editingShipId && (
@@ -2136,7 +2110,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                       setShipName('');
                       setShipCharge(0);
                     }}
-                    className="bg-amber-500 hover:bg-amber-600 font-extrabold text-[#111827] text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                    className="bg-amber-500 hover:bg-amber-600 font-bold text-[#111827] text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Add New Zone</span>
@@ -2147,7 +2121,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               {/* Form to Add or Edit Shipping Area */}
               {(isAddingShippingArea || editingShipId) && (
                 <div className="bg-slate-50 border border-amber-200/40 p-4 rounded-2xl max-w-md animation-fade-in space-y-4">
-                  <h4 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
                     {editingShipId ? '🛠️ Edit Shipping Zone' : '✨ Add New Shipping Zone'}
                   </h4>
                   <form onSubmit={handleSaveShippingArea} className="space-y-4 text-xs">
@@ -2177,7 +2151,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     <div className="flex gap-2">
                       <button
                         type="submit"
-                        className="bg-amber-500 hover:bg-amber-600 font-extrabold text-[#111827] px-4 py-2 rounded transition cursor-pointer"
+                        className="bg-amber-500 hover:bg-amber-600 font-bold text-[#111827] px-4 py-2 rounded transition cursor-pointer"
                       >
                         {editingShipId ? 'Save Changes' : 'Publish Zone'}
                       </button>
@@ -2189,7 +2163,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                           setShipName('');
                           setShipCharge(0);
                         }}
-                        className="bg-slate-200 hover:bg-slate-300 text-slate-705 font-extrabold px-4 py-2 rounded transition cursor-pointer"
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-705 font-bold px-4 py-2 rounded transition cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -2205,7 +2179,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     <div>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-[#15803d]" />
-                        <span className="font-extrabold text-slate-800 text-sm">{area.name}</span>
+                        <span className="font-bold text-slate-800 text-sm">{area.name}</span>
                       </div>
                       <p className="text-xs font-bold text-[#15803d] font-mono mt-1.5">
                         Charge: {area.charge} AED
@@ -2220,7 +2194,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                           setShipName(area.name);
                           setShipCharge(area.charge);
                         }}
-                        className="text-amber-600 hover:text-amber-700 font-extrabold hover:underline flex items-center gap-1 focus:outline-none cursor-pointer"
+                        className="text-amber-600 hover:text-amber-700 font-bold hover:underline flex items-center gap-1 focus:outline-none cursor-pointer"
                       >
                         <Edit className="w-3.5 h-3.5" />
                         <span>Edit</span>
@@ -2231,7 +2205,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                             handleDeleteShippingArea(area.id);
                           }
                         }}
-                        className="text-rose-600 hover:text-rose-700 font-extrabold hover:underline flex items-center gap-1 ml-auto focus:outline-none cursor-pointer"
+                        className="text-rose-600 hover:text-rose-700 font-bold hover:underline flex items-center gap-1 ml-auto focus:outline-none cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Delete</span>
@@ -2255,7 +2229,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center gap-3">
                 <MessageCircle className="w-8 h-8 text-emerald-600 shrink-0" />
                 <div>
-                  <h4 className="text-sm font-black text-emerald-800 uppercase">Chat with Store Help Desk Settings</h4>
+                  <h4 className="text-sm font-bold text-emerald-800 uppercase">Chat with Store Help Desk Settings</h4>
                   <p className="text-[10px] text-emerald-600 font-semibold leading-relaxed">
                     Update the dynamic help desk support properties. Any changes will immediately synchronize for all active users browsing the store in real-time.
                   </p>
@@ -2264,19 +2238,25 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
               <div className="bg-white border border-slate-150 rounded-2xl p-5 space-y-4 shadow-sm">
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-slate-700 block uppercase">Help Desk Phone Number (WhatsApp)</label>
-                  <p className="text-[10px] text-slate-400 mb-1">Enter numbers only without spaces or symbols (e.g., 01715838191)</p>
+                  <label className="text-xs font-bold text-slate-700 block uppercase">Help Desk Phone Number (WhatsApp)</label>
+                  <p className="text-[10px] text-slate-400 mb-1">Enter numbers only; you can also use a + prefix for international codes (e.g., +971500000000 or 01715838191)</p>
                   <input 
                     type="text"
                     value={storeContact.phone}
-                    onChange={(e) => setStoreContact(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const sanitized = val.startsWith('+') 
+                        ? '+' + val.slice(1).replace(/\D/g, '') 
+                        : val.replace(/\D/g, '');
+                      setStoreContact(prev => ({ ...prev, phone: sanitized }));
+                    }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-bold"
-                    placeholder="e.g. 01715838191"
+                    placeholder="e.g. +971501234567"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-slate-700 block uppercase">Hours of Operation / Availability Text</label>
+                  <label className="text-xs font-bold text-slate-700 block uppercase">Hours of Operation / Availability Text</label>
                   <input 
                     type="text"
                     value={storeContact.hours}
@@ -2294,12 +2274,21 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                         return;
                       }
                       
+                      // Calculate dynamic whatsapp url based on phone format and + prefix
+                      let clean_num = storeContact.phone.replace(/[^\d]/g, '');
+                      let determinedWhatsappUrl = `https://wa.me/${clean_num}`;
+                      if (!storeContact.phone.startsWith('+')) {
+                        if (storeContact.phone.startsWith('01') && storeContact.phone.length === 11) {
+                          determinedWhatsappUrl = `https://wa.me/88${storeContact.phone}`;
+                        }
+                      }
+
                       fetch('/api/store-contact', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           phone: storeContact.phone,
-                          whatsappUrl: `https://wa.me/88${storeContact.phone}`,
+                          whatsappUrl: determinedWhatsappUrl,
                           hours: storeContact.hours
                         })
                       })
@@ -2315,7 +2304,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                           showToast('Failed to save settings to server.', 'error');
                         });
                     }}
-                    className="w-full bg-[#ff9900] hover:bg-amber-600 text-black font-black text-xs py-3 px-4 rounded-xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center justify-center gap-2 animate-fade-in"
+                    className="w-full bg-[#ff9900] hover:bg-amber-600 text-black font-bold text-xs py-3 px-4 rounded-xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center justify-center gap-2 animate-fade-in"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>SAVE HELP DESK SETTINGS</span>
@@ -2332,7 +2321,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="flex items-center gap-3">
                   <Ticket className="w-8 h-8 text-violet-600 shrink-0" />
                   <div>
-                    <h4 className="text-sm font-black text-violet-800 uppercase">Discount Coupons Manager</h4>
+                    <h4 className="text-sm font-bold text-violet-800 uppercase">Discount Coupons Manager</h4>
                     <p className="text-[10px] text-violet-600 font-semibold leading-relaxed">
                       Create percentage-based discount coupons for buyers to apply during checkout.
                     </p>
@@ -2341,7 +2330,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <button
                   type="button"
                   onClick={() => setIsAddingCoupon(!isAddingCoupon)}
-                  className="bg-violet-600 hover:bg-violet-700 text-white font-black text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{isAddingCoupon ? 'Close Form' : 'Add Coupon'}</span>
@@ -2351,10 +2340,10 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               {/* Add Coupon form */}
               {isAddingCoupon && (
                 <form onSubmit={handleAddNewCoupon} className="bg-white border border-slate-150 rounded-2xl p-5 space-y-4 shadow-sm animate-fade-in">
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">Add New Active Coupon</h4>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">Add New Active Coupon</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-600 uppercase">Coupon Code</label>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase">Coupon Code</label>
                       <input 
                         type="text" 
                         required
@@ -2365,7 +2354,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-650 uppercase">Discount Percent (%)</label>
+                      <label className="text-[10px] font-bold text-slate-650 uppercase">Discount Percent (%)</label>
                       <select 
                         value={couponPercent}
                         onChange={(e) => setCouponPercent(Number(e.target.value))}
@@ -2378,7 +2367,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-600 uppercase">Description / Meta Text</label>
+                    <label className="text-[10px] font-bold text-slate-600 uppercase">Description / Meta Text</label>
                     <input 
                       type="text"
                       value={couponDesc}
@@ -2389,7 +2378,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   </div>
                   <button
                     type="submit"
-                    className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black text-xs py-2.5 px-4 rounded-xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Check className="w-4 h-4" />
                     <span>CREATE COUPON CODE</span>
@@ -2404,7 +2393,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     <div key={coupon.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition duration-75">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="bg-violet-100 text-violet-800 font-mono text-xs font-black px-2.5 py-1 rounded-lg border border-violet-200">
+                          <span className="bg-violet-100 text-violet-800 font-mono text-xs font-bold px-2.5 py-1 rounded-lg border border-violet-200">
                             {coupon.code}
                           </span>
                           <span className="text-[#15803d] font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
@@ -2439,29 +2428,37 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
       {/* --- ADD / EDIT PRODUCT DRAWER OVERLAY --- */}
       {(isAddingProduct || editingProduct) && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl relative max-w-sm w-full text-left">
-            <button 
-              onClick={() => {
-                setIsAddingProduct(false);
-                setEditingProduct(null);
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-800"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto flex flex-col">
+          {/* Full Screen Header */}
+          <div className="bg-white border-b border-slate-200 sticky top-0 z-10 py-4 px-4 sm:px-8 shadow-sm">
+            <div className="max-w-4xl mx-auto flex justify-between items-center">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 font-sans tracking-tight">
+                  {editingProduct ? 'Modify Product Specifications' : 'Upload New Furniture Item'}
+                </h3>
+                <p className="text-[10px] text-slate-500 font-sans mt-0.5">Please fill out all details to publish or update the catalog correctly.</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsAddingProduct(false);
+                  setEditingProduct(null);
+                }}
+                className="text-slate-400 hover:text-slate-800 p-2 hover:bg-slate-100 rounded-full cursor-pointer focus:outline-none transition-all flex items-center justify-center"
+              >
+                <X className="w-5.5 h-5.5" />
+              </button>
+            </div>
+          </div>
 
-            <h3 className="text-sm font-extrabold text-slate-900 border-b border-slate-250 pb-2.5 mb-4">
-              {editingProduct ? 'Modifier Product Specifications' : 'Upload New Furniture Item'}
-            </h3>
-
-            <form onSubmit={editingProduct ? handleUpdateProduct : handleAddNewProduct} className="space-y-3.5 text-xs">
+          {/* Full Screen Body Content Container */}
+          <div className="flex-1 bg-white max-w-4xl w-full mx-auto p-4 sm:p-8 shadow-sm border-x border-slate-100">
+            <form onSubmit={editingProduct ? handleUpdateProduct : handleAddNewProduct} className="space-y-5 text-xs">
               <div className="space-y-1">
                 <label className="font-bold text-slate-500 block">Furniture Category</label>
                 <select 
                   value={prodCategory}
                   onChange={(e) => setProdCategory(e.target.value)}
-                  className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none cursor-pointer focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none cursor-pointer focus:border-amber-500"
                 >
                   {localCategories.length > 0 ? (
                     localCategories.map((cat) => (
@@ -2486,7 +2483,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   placeholder="e.g. Segun Table, Mahogany Bed"
                   value={prodName}
                   onChange={(e) => setProdName(e.target.value)}
-                  className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -2499,7 +2496,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     placeholder="Regular price"
                     value={prodPrice}
                     onChange={(e) => setProdPrice(Number(e.target.value))}
-                    className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
+                    className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none focus:border-amber-500"
                   />
                 </div>
 
@@ -2510,7 +2507,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     placeholder="Optional original price"
                     value={prodOldPrice || ''}
                     onChange={(e) => setProdOldPrice(e.target.value ? Number(e.target.value) : undefined)}
-                    className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
+                    className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -2523,7 +2520,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   placeholder="Tell clients about materials, finishes, craftsmanship..."
                   value={prodDesc}
                   onChange={(e) => setProdDesc(e.target.value)}
-                  className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none resize-none focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none resize-none focus:border-amber-500"
                 />
               </div>
 
@@ -2541,19 +2538,19 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     const val = Number(e.target.value);
                     setProdDiscountPercent(Math.min(100, Math.max(0, val || 0)));
                   }}
-                  className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none focus:border-amber-500 shadow-sm text-xs font-mono"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none focus:border-amber-500 shadow-sm text-xs font-mono"
                 />
                 <div className="bg-amber-50/50 border border-amber-100 rounded-lg p-2.5 mt-1.5 text-[10px] text-slate-650 leading-normal space-y-1">
                   <p className="font-semibold text-slate-700">Live Automatic Subtraction:</p>
                   <p>• Regular Price: <span className="font-bold text-slate-800 font-mono">{prodPrice ? prodPrice.toLocaleString() : '0'} AED</span></p>
                   <p>• Off Discount: <span className="font-bold text-red-600 font-mono">{prodDiscountPercent}%</span> (-{Math.round(prodPrice * (prodDiscountPercent / 100)).toLocaleString()} AED)</p>
-                  <p>• Final Buyer Price: <span className="font-black text-emerald-700 font-mono">{Math.round(prodPrice * (1 - prodDiscountPercent / 100)).toLocaleString()} AED</span></p>
+                  <p>• Final Buyer Price: <span className="font-bold text-emerald-700 font-mono">{Math.round(prodPrice * (1 - prodDiscountPercent / 100)).toLocaleString()} AED</span></p>
                 </div>
               </div>
 
               {/* 4 Multi-image upload slots */}
-              <div className="space-y-3 bg-slate-50 p-2.5 rounded-xl border border-slate-205">
-                <span className="font-black text-slate-750 block uppercase tracking-wide text-[9px] mb-1.5 border-b border-slate-200 pb-1">
+              <div className="space-y-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <span className="font-bold text-slate-700 block uppercase tracking-wide text-[9px] mb-1.5 border-b border-slate-200 pb-1">
                   Product Images (Upload at least 4 photos)
                 </span>
                 {[0, 1, 2, 3].map((idx) => (
@@ -2598,7 +2595,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                       />
                       <label 
                         htmlFor={`prod-file-${idx}`}
-                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-2.5 py-1.5 rounded text-[9px] uppercase tracking-wide cursor-pointer select-none transition"
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-2.5 py-1.5 rounded text-[9px] uppercase tracking-wide cursor-pointer select-none transition"
                       >
                         Choose Photo
                       </label>
@@ -2626,7 +2623,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   id="trending_check"
                   checked={prodIsTrending}
                   onChange={(e) => setProdIsTrending(e.target.checked)}
-                  className="rounded border-slate-350 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
+                  className="rounded border-slate-300 text-amber-500 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
                 />
                 <label htmlFor="trending_check" className="font-bold text-slate-700 text-xs cursor-pointer">
                   Display as Trending Recommendation
@@ -2635,7 +2632,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
               <button 
                 type="submit"
-                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2 rounded transition-colors text-center cursor-pointer"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded transition-colors text-center cursor-pointer mt-2"
               >
                 {editingProduct ? 'Update Inventory Item' : 'Publish Product to Store'}
               </button>
@@ -2646,20 +2643,21 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
       {/* --- EDIT ORDER DETAILS OVERLAY MODAL --- */}
       {editingOrder && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl relative max-w-sm w-full text-left">
-            <button 
-              onClick={() => setEditingOrder(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-800 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center sm:p-4 z-50 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-none sm:rounded-2xl p-4 sm:p-6 shadow-2xl relative w-full h-full sm:h-auto sm:max-h-[90vh] max-w-lg text-left flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 shrink-0 mb-3.5">
+              <h3 className="text-sm font-bold text-slate-900 font-sans">
+                Edit Order #{editingOrder.id} Details
+              </h3>
+              <button 
+                onClick={() => setEditingOrder(null)}
+                className="text-slate-400 hover:text-slate-800 p-1 cursor-pointer focus:outline-none"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <h3 className="text-sm font-extrabold text-slate-900 border-b border-slate-250 pb-2.5 mb-4">
-              Edit Order #{editingOrder.id} Details
-            </h3>
-
-            <form onSubmit={saveOrderEdits} className="space-y-3.5 text-xs">
+            <form onSubmit={saveOrderEdits} className="space-y-3.5 text-xs flex-1 overflow-y-auto pr-1">
               <div className="space-y-1">
                 <label className="font-bold text-slate-500 block">Customer Name</label>
                 <input 
@@ -2667,7 +2665,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   required 
                   value={editingOrder.customerName}
                   onChange={(e) => setEditingOrder({ ...editingOrder, customerName: e.target.value })}
-                  className="w-full bg-white border border-slate-300 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -2678,7 +2676,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   required 
                   value={editingOrder.customerMobile}
                   onChange={(e) => setEditingOrder({ ...editingOrder, customerMobile: e.target.value })}
-                  className="w-full bg-white border border-slate-300 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -2695,7 +2693,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                       shippingCharge: newCharge
                     });
                   }}
-                  className="w-full bg-white border border-slate-300 rounded p-2 text-slate-850 outline-none cursor-pointer focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none cursor-pointer focus:border-amber-500"
                 >
                   {shippingAreas.map((area) => (
                     <option key={area.id} value={area.id}>
@@ -2718,7 +2716,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   required 
                   value={editingOrder.deliveryAddress}
                   onChange={(e) => setEditingOrder({ ...editingOrder, deliveryAddress: e.target.value })}
-                  className="w-full bg-white border border-slate-300 rounded p-2 text-slate-850 outline-none resize-none focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none resize-none focus:border-amber-500"
                 />
               </div>
 
@@ -2730,7 +2728,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     required 
                     value={editingOrder.total}
                     onChange={(e) => setEditingOrder({ ...editingOrder, total: Number(e.target.value) })}
-                    className="w-full bg-white border border-slate-300 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
+                    className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none focus:border-amber-500"
                   />
                 </div>
 
@@ -2739,7 +2737,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   <select 
                     value={editingOrder.status}
                     onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value as any })}
-                    className="w-full bg-white border border-slate-300 rounded p-2 text-slate-850 outline-none cursor-pointer focus:border-amber-500"
+                    className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none cursor-pointer focus:border-amber-500"
                   >
                     <option value="pending">Pending</option>
                     <option value="confirmed">Confirmed</option>
@@ -2757,13 +2755,13 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   value={editingOrder.note || ''}
                   onChange={(e) => setEditingOrder({ ...editingOrder, note: e.target.value })}
                   placeholder="Internal courier references, etc."
-                  className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none focus:border-amber-500"
                 />
               </div>
 
               <button 
                 type="submit"
-                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 rounded-lg transition-colors text-center cursor-pointer shadow-sm text-xs mt-3"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2.5 rounded-lg transition-colors text-center cursor-pointer shadow-sm text-xs mt-3"
               >
                 Save Changes
               </button>
