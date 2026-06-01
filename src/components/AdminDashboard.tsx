@@ -63,7 +63,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   
   // Tab states
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'sessions' | 'security' | 'hero_banner' | 'categories' | 'shipping_areas' | 'help_desk' | 'coupons'>('products');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'sessions' | 'security' | 'hero_banner' | 'categories' | 'shipping_areas' | 'help_desk' | 'coupons' | null>(null);
+  const [isSystemLoaded, setIsSystemLoaded] = useState(false);
 
   // Search & Filter states - Orders
   const [orderQuery, setOrderQuery] = useState('');
@@ -226,7 +227,49 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   };
 
   useEffect(() => {
-    fetchAllData();
+    const loadInitialSystems = async () => {
+      try {
+        await Promise.allSettled([
+          fetch('/api/orders').then((res) => res.json()).then((data) => {
+            if (Array.isArray(data)) setOrders(data);
+          }),
+          fetch('/api/products').then((res) => res.json()).then((data) => {
+            if (Array.isArray(data)) {
+              setProducts(data);
+              onRefreshProducts();
+            }
+          }),
+          fetch('/api/sessions/active').then((res) => res.json()).then((data) => {
+            if (Array.isArray(data)) setActiveSessions(data);
+          }),
+          fetch('/api/slides').then((res) => res.json()).then((data) => {
+            if (Array.isArray(data)) setLocalSlides(data);
+          }),
+          fetch('/api/categories').then((res) => res.json()).then((data) => {
+            if (Array.isArray(data)) setLocalCategories(data);
+          }),
+          fetch('/api/shipping-areas').then((res) => res.json()).then((data) => {
+            if (Array.isArray(data)) setShippingAreas(data);
+          }),
+          fetch('/api/store-contact').then((res) => res.json()).then((data) => {
+            if (data && data.phone) setStoreContact(data);
+          }),
+          fetch('/api/coupons').then((res) => res.json()).then((data) => {
+            if (Array.isArray(data)) setCouponsList(data);
+          })
+        ]);
+        // Fast artificial timeout to guarantee super smooth transition
+        setTimeout(() => {
+          setIsSystemLoaded(true);
+        }, 800);
+      } catch (err) {
+        console.error("Initial systems loading error:", err);
+        setIsSystemLoaded(true);
+      }
+    };
+
+    loadInitialSystems();
+
     // Auto-refresh active device tracking and orders list every 7 seconds
     const interval = setInterval(fetchAllData, 7000);
     return () => clearInterval(interval);
@@ -781,6 +824,50 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
   const cancelRate = orders.length ? Math.round((cancelledOrdersCount / orders.length) * 100) : 0;
 
+  if (!isSystemLoaded) {
+    return (
+      <div className="bg-slate-50 text-slate-800 min-h-screen flex flex-col items-center justify-center p-6 font-sans">
+        <div className="w-full max-w-sm bg-white rounded-3xl border border-slate-100 p-8 shadow-2xl space-y-6 text-center transform duration-300">
+          {/* Logo brand and spin */}
+          <div className="flex flex-col items-center space-y-4">
+            <div className="relative">
+              <div className="w-14 h-14 rounded-full border-4 border-emerald-500/20 border-t-[#15803d] animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Box className="w-5 h-5 text-[#15803d] animate-pulse" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-lg font-black text-slate-900 tracking-tight uppercase leading-none">RK Furniture Hub</h2>
+              <p className="text-[9px] uppercase tracking-widest text-[#15803d] font-extrabold">Admin Core System</p>
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* Loading status lists */}
+          <div className="space-y-3.5 text-left">
+            <p className="text-xs text-slate-500 text-center font-bold font-sans">
+              Syncing live databases with Google Firestore...
+            </p>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase font-mono">
+                <span>Products Catalog</span>
+                <span className="text-[#15803d] animate-pulse">Connecting...</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-600 rounded-full animate-pulse" style={{ width: '85%' }} />
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 pt-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              <span className="text-[9px] text-slate-400 font-extrabold uppercase font-mono tracking-wider">Establishing security token</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white text-slate-800 min-h-screen p-4 sm:p-6 font-sans relative">
       
@@ -1293,7 +1380,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-md">
           
           {/* Header indicator with the yellow bulb and clicked function's name */}
-          {activeTab !== 'products' && (
+          {activeTab !== 'products' && activeTab !== null && (
             <div className="flex items-center gap-2.5 pb-3.5 mb-5 border-b border-slate-200 text-left">
               <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
               <span className="text-sm font-black uppercase tracking-wider text-slate-800 font-sans">
@@ -1306,6 +1393,51 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 {activeTab === 'help_desk' && 'Chat Store Help Desk'}
                 {activeTab === 'coupons' && 'Discount Coupons & Promo Codes'}
               </span>
+            </div>
+          )}
+
+          {/* Default Unselected Welcome / Instructional Panel */}
+          {activeTab === null && (
+            <div className="flex flex-col items-center justify-center text-center py-14 px-6 space-y-6 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-200/60 flex items-center justify-center">
+                  <TrendingUp className="w-7 h-7 text-amber-600 animate-pulse" />
+                </div>
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#15803d] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-[#15803d]"></span>
+                </span>
+              </div>
+              <div className="space-y-2 max-w-md">
+                <h3 className="text-base sm:text-lg font-black text-slate-850 tracking-tight uppercase font-sans">
+                  RK Management Core Online
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-semibold">
+                  Welcome to the control center backend. System databases are fully synchronized in real-time with Google Firestore.
+                </p>
+                <div className="pt-2">
+                  <p className="inline-flex items-center gap-2 bg-[#f0f9ff] text-sky-800 border border-sky-100 font-bold font-mono text-[10px] px-3.5 py-2 rounded-full select-none leading-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+                    Please click any system above to display its corresponding manager.
+                  </p>
+                </div>
+              </div>
+
+              {/* Minimal metrics cards preview for quick context */}
+              <div className="grid grid-cols-3 gap-3.5 w-full max-w-lg pt-4">
+                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-xs text-center font-sans">
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">PRODUCTS</p>
+                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{products.length}</p>
+                </div>
+                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-xs text-center font-sans">
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">ORDERS</p>
+                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{orders.length}</p>
+                </div>
+                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-xs text-center font-sans">
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">COUPONS</p>
+                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{couponsList.length}</p>
+                </div>
+              </div>
             </div>
           )}
 
