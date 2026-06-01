@@ -642,7 +642,11 @@ app.post('/api/store-contact', async (req, res) => {
       whatsappUrl: whatsappUrl || `https://wa.me/88${phone || '01715838191'}`,
       hours: hours || 'Available 24/7 for support'
     };
-    await setDoc(doc(db, 'store_contact', 'contact_info'), updatedContact);
+    try {
+      await setDoc(doc(db, 'store_contact', 'contact_info'), updatedContact);
+    } catch (firestoreErr) {
+      console.warn('Failed to save store-contact to Firestore (unreachable or offline), proceeding with local disk save:', firestoreErr);
+    }
     writeJSONFile(STORE_CONTACT_DB_PATH, [updatedContact]);
     res.json(updatedContact);
   } catch (err) {

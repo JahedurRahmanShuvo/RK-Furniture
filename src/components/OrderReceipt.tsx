@@ -236,9 +236,16 @@ export default function OrderReceipt({ order, onClose }: OrderReceiptProps) {
           {/* Top Info block (Sender / Summary metadata) */}
           <div className="bg-slate-50/50 rounded-2xl border border-slate-100 p-5 flex flex-col sm:flex-row justify-between items-start gap-4 mb-4 text-left text-xs text-slate-700 leading-relaxed shadow-sm">
             <div>
-              <h2 className="text-base font-extrabold text-slate-900 tracking-tight mb-2 font-sans">RK Furniture</h2>
+              <div className="flex items-center gap-2 mb-2">
+                <img
+                  src="https://i.postimg.cc/63KXZNcz/20260530-101216.png"
+                  alt="RK Furniture Logo"
+                  className="h-12 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
               <div className="space-y-1 text-slate-600">
-                <p><span className="font-semibold text-slate-400">Address:</span> </p>
+                <p><span className="font-semibold text-slate-400">Address:</span> Dubai, UAE</p>
                 <p><span className="font-semibold text-slate-400">Email:</span> N/A</p>
                 <p><span className="font-semibold text-slate-400">Mobile number:</span> 01715838191</p>
               </div>

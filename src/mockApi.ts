@@ -278,20 +278,88 @@ async function getFirestoreUsers(): Promise<{ [key: string]: any }> {
 }
 
 async function saveFirestoreDoc(collectionName: string, docId: string, data: any) {
+  // 1. Maintain robust offline-first local cache backup
+  try {
+    if (collectionName === 'users') {
+      const stored = localStorage.getItem('rk_registered_users');
+      let dict: any = {};
+      if (stored) {
+        try { dict = JSON.parse(stored); } catch { dict = {}; }
+      }
+      dict[docId] = data;
+      localStorage.setItem('rk_registered_users', JSON.stringify(dict));
+    } else {
+      const stored = localStorage.getItem(`netlify_${collectionName}`);
+      let list: any[] = [];
+      if (stored) {
+        try { list = JSON.parse(stored); } catch { list = []; }
+      }
+      
+      // Keep it up to date/append
+      const itemToSave = { ...data };
+      const idx = list.findIndex((item: any) => {
+        const itemId = String(item.id || item.orderNumber || '');
+        return itemId === String(docId);
+      });
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...itemToSave };
+      } else {
+        list.push(itemToSave);
+      }
+      localStorage.setItem(`netlify_${collectionName}`, JSON.stringify(list));
+    }
+  } catch (err) {
+    console.warn(`[Local cache write fallback error] pre-sync update failed:`, err);
+  }
+
+  // 2. Perform Firestore write (non-blocking in background)
   try {
     const docRef = doc(db, collectionName, docId);
-    await setDoc(docRef, data);
+    setDoc(docRef, data).catch((err) => {
+      console.warn(`[Firestore saveDoc background write failed] ${collectionName}/${docId}:`, err);
+    });
   } catch (err) {
-    console.error(`[Firestore saveDoc error] ${collectionName}/${docId}:`, err);
+    console.error(`[Firestore saveDoc setup error] ${collectionName}/${docId}:`, err);
   }
 }
 
 async function deleteFirestoreDoc(collectionName: string, docId: string) {
+  // 1. Maintain robust offline-first local cache backup for deletes
+  try {
+    if (collectionName === 'users') {
+      const stored = localStorage.getItem('rk_registered_users');
+      if (stored) {
+        try {
+          const dict = JSON.parse(stored);
+          delete dict[docId];
+          localStorage.setItem('rk_registered_users', JSON.stringify(dict));
+        } catch {}
+      }
+    } else {
+      const stored = localStorage.getItem(`netlify_${collectionName}`);
+      if (stored) {
+        try {
+          let list = JSON.parse(stored);
+          list = list.filter((item: any) => {
+            const itemId = String(item.id || item.orderNumber || '');
+            return itemId !== String(docId);
+          });
+          localStorage.setItem(`netlify_${collectionName}`, JSON.stringify(list));
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.warn(`[Local cache write fallback error] pre-sync delete failed:`, err);
+  }
+
+  // 2. Perform Firestore delete (non-blocking in background)
   try {
     const docRef = doc(db, collectionName, docId);
-    await deleteDoc(docRef);
+    deleteDoc(docRef).catch((err) => {
+      console.warn(`[Firestore deleteDoc background delete failed] ${collectionName}/${docId}:`, err);
+    });
   } catch (err) {
-    console.error(`[Firestore deleteDoc error] ${collectionName}/${docId}:`, err);
+    console.error(`[Firestore deleteDoc setup error] ${collectionName}/${docId}:`, err);
   }
 }
 
@@ -419,6 +487,51 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
     } else if (method === 'DELETE' && idValue) {
       await deleteFirestoreDoc('shipping_areas', idValue);
       responseData = { success: true, message: 'Shipping area deleted' };
+    }
+  }
+
+  // 3c. STORE CONTACT HELP DESK
+  else if (resource === 'store-contact') {
+    const defaultContact = [{
+      id: 'contact_info',
+      phone: '01715838191',
+      whatsappUrl: 'https://wa.me/8801715838191',
+      hours: 'Available 24/7 for support'
+    }];
+    const currentContacts = await getFirestoreCollection('store_contact', defaultContact);
+
+    if (method === 'GET') {
+      responseData = currentContacts[0] || defaultContact[0];
+    } else if (method === 'POST') {
+      const payload = JSON.parse(init?.body as string);
+      const updatedContact = {
+        id: 'contact_info',
+        phone: payload.phone || '01715838191',
+        whatsappUrl: payload.whatsappUrl || `https://wa.me/88${payload.phone || '01715838191'}`,
+        hours: payload.hours || 'Available 24/7 for support'
+      };
+      await saveFirestoreDoc('store_contact', 'contact_info', updatedContact);
+      responseData = updatedContact;
+    }
+  }
+
+  // 3d. COUPONS
+  else if (resource === 'coupons') {
+    const currentCoupons = await getFirestoreCollection('coupons', []);
+
+    if (method === 'GET') {
+      responseData = currentCoupons;
+    } else if (method === 'POST') {
+      const payload = JSON.parse(init?.body as string);
+      if (!payload.id) {
+        payload.id = 'coupon_' + Date.now();
+      }
+      await saveFirestoreDoc('coupons', payload.id, payload);
+      responseData = payload;
+      status = 201;
+    } else if (method === 'DELETE' && idValue) {
+      await deleteFirestoreDoc('coupons', idValue);
+      responseData = { success: true, message: 'Coupon deleted successfully' };
     }
   }
 
