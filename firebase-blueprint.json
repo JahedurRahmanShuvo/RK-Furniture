@@ -86,6 +86,31 @@
         "password": { "type": "string" }
       },
       "required": ["name", "email"]
+    },
+    "StoreContact": {
+      "title": "StoreContact",
+      "description": "Store help desk contact details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsappUrl": { "type": "string" },
+        "hours": { "type": "string" }
+      },
+      "required": ["id", "phone", "whatsappUrl"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Discount coupon codes managed by admin",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "discountPercent": { "type": "integer" },
+        "description": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "code", "discountPercent", "isActive"]
     }
   },
   "firestore": {
@@ -112,6 +137,14 @@
     "/users/{phone}": {
       "schema": "User",
       "description": "System users mapped by mobile number"
+    },
+    "/store_contact/{contactId}": {
+      "schema": "StoreContact",
+      "description": "Store live support help desk number properties"
+    },
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Dynamic promo discount coupons"
     }
   }
 }

@@ -14,6 +14,20 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
   const [detailQty, setDetailQty] = useState(1);
   const [selectedGalleryImg, setSelectedGalleryImg] = useState(prod.image);
 
+  // Synchronize state when product changes
+  React.useEffect(() => {
+    setSelectedGalleryImg(prod.image);
+    setDetailQty(1);
+  }, [prod.id, prod.image]);
+
+  const hasDiscount = !!prod.discountPercent && prod.discountPercent > 0;
+  const currentPrice = hasDiscount 
+    ? Math.round(prod.price * (1 - prod.discountPercent / 100))
+    : prod.price;
+  const oldPrice = hasDiscount 
+    ? prod.price 
+    : (prod.oldPrice || undefined);
+
   return (
     <div className="space-y-5">
       {/* Back Navigation header */}
@@ -28,7 +42,12 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
       <div className="bg-white rounded-2xl border border-slate-100 p-5 grid grid-cols-1 md:grid-cols-2 gap-6 shadow-sm">
         {/* Left: Gallery of Images */}
         <div className="space-y-3">
-          <div className="bg-slate-50 rounded-xl h-56 sm:h-72 overflow-hidden flex items-center justify-center p-4 border border-slate-100">
+          <div className="bg-slate-50 rounded-xl h-56 sm:h-72 overflow-hidden flex items-center justify-center p-4 border border-slate-100 relative">
+            {hasDiscount && (
+              <span className="absolute top-3 left-3 bg-[#e11d48] text-white text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm uppercase shrink-0">
+                {prod.discountPercent}% OFF
+              </span>
+            )}
             {selectedGalleryImg === 'placeholder_box' ? (
               <BoxWithRays className="w-32 h-32 text-slate-800" />
             ) : (
@@ -43,10 +62,11 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
 
           {/* Small gallery thumbnails list */}
           {prod.images && prod.images.length > 1 && (
-            <div className="flex gap-2">
-              {prod.images.map((img, i) => (
+            <div className="flex gap-2 flex-wrap">
+              {prod.images.filter(img => img !== '').map((img, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => setSelectedGalleryImg(img)}
                   className={`w-14 h-14 rounded border overflow-hidden bg-slate-50 p-1 transition ${
                     selectedGalleryImg === img ? 'border-[#c25927] ring-2 ring-orange-100' : 'border-slate-200'
@@ -69,8 +89,15 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight font-sans">
               {prod.name}
             </h2>
-            <div className="text-2xl font-extrabold text-[#c25927] pt-1">
-              {prod.price.toLocaleString()} AED
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-2xl font-extrabold text-[#c25927] font-mono">
+                {currentPrice.toLocaleString()} AED
+              </span>
+              {oldPrice && (
+                <span className="text-slate-400 font-bold line-through text-md font-mono">
+                  {oldPrice.toLocaleString()} AED
+                </span>
+              )}
             </div>
           </div>
 

@@ -3,9 +3,10 @@ import {
   Trash2, Plus, Search, LogOut, RefreshCw, 
   ShoppingBag, TrendingUp, Box, Edit, Users, 
   CheckCircle2, Clock, Truck, Laptop, Phone, 
-  MapPin, Lock, X, Check, Eye, Tags
+  MapPin, Lock, X, Check, Eye, Tags, MessageCircle, Ticket, ClipboardList
 } from 'lucide-react';
 import { Product, Order, OrderStatus } from '../types';
+import OrderReceipt from './OrderReceipt';
 
 interface AdminDashboardProps {
   user: { name: string; phone: string; isLoggedIn: boolean };
@@ -62,7 +63,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   
   // Tab states
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'sessions' | 'security' | 'hero_banner' | 'categories' | 'shipping_areas'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'sessions' | 'security' | 'hero_banner' | 'categories' | 'shipping_areas' | 'help_desk' | 'coupons'>('products');
 
   // Search & Filter states - Orders
   const [orderQuery, setOrderQuery] = useState('');
@@ -86,7 +87,16 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [prodOldPrice, setProdOldPrice] = useState<number | undefined>(undefined);
   const [prodDesc, setProdDesc] = useState('');
   const [prodImage, setProdImage] = useState('');
+  const [prodImages, setProdImages] = useState<string[]>(['', '', '', '']);
+  const [prodDiscountPercent, setProdDiscountPercent] = useState<number>(0);
   const [prodIsTrending, setProdIsTrending] = useState(false);
+
+  // Coupon configuration forms
+  const [couponsList, setCouponsList] = useState<any[]>([]);
+  const [isAddingCoupon, setIsAddingCoupon] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponPercent, setCouponPercent] = useState(10);
+  const [couponDesc, setCouponDesc] = useState('');
   
   // Password Reset forms
   const [newPassword, setNewPassword] = useState('');
@@ -123,6 +133,13 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [shipName, setShipName] = useState('');
   const [shipCharge, setShipCharge] = useState<number>(0);
   const [editingShipId, setEditingShipId] = useState<string | null>(null);
+
+  // Store Contact state
+  const [storeContact, setStoreContact] = useState<{ phone: string; whatsappUrl: string; hours: string }>({
+    phone: '01715838191',
+    whatsappUrl: 'https://wa.me/8801715838191',
+    hours: 'Available 24/7 for support'
+  });
 
   // Load backend statistics
   const fetchAllData = () => {
@@ -186,6 +203,26 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         }
       })
       .catch((err) => console.error('Admin API error loading shipping areas:', err));
+
+    // 7. Fetch Dynamic Store Contact Settings
+    fetch('/api/store-contact')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.phone) {
+          setStoreContact(data);
+        }
+      })
+      .catch((err) => console.error('Admin API error loading store contact:', err));
+
+    // 8. Fetch coupons
+    fetch('/api/coupons')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCouponsList(data);
+        }
+      })
+      .catch((err) => console.error('Admin API error loading coupons list:', err));
   };
 
   useEffect(() => {
@@ -273,11 +310,12 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   // Add Product Submit
   const handleAddNewProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prodImage) {
-      showToast('অনুগ্রহ করে প্রোডাক্টের জন্য একটি ফটো আপলোড করুন!', 'error');
+    const uploadedImages = prodImages.filter((img) => img !== '');
+    if (uploadedImages.length < 4) {
+      showToast('অনুগ্রহ করে কমপক্ষে ৪টি ছবি আপলোড করুন!', 'error');
       return;
     }
-    const cleanImg = prodImage;
+    const cleanImg = uploadedImages[0];
     const newProd = {
       name: prodName,
       price: prodPrice,
@@ -285,7 +323,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       category: prodCategory,
       description: prodDesc,
       image: cleanImg,
-      images: [cleanImg],
+      images: uploadedImages,
+      discountPercent: prodDiscountPercent,
       isTrending: prodIsTrending
     };
 
@@ -303,9 +342,11 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         setProdOldPrice(undefined);
         setProdDesc('');
         setProdImage('');
+        setProdImages(['', '', '', '']);
+        setProdDiscountPercent(0);
         setProdIsTrending(false);
         fetchAllData();
-        showToast('New product added successfully to catalog!', 'success');
+        showToast('New product added successfully to catalog with gallery!', 'success');
       })
       .catch((err) => {
         console.error('Failed to create product:', err);
@@ -318,6 +359,12 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     e.preventDefault();
     if (!editingProduct) return;
 
+    const uploadedImages = prodImages.filter((img) => img !== '');
+    if (uploadedImages.length < 4) {
+      showToast('অনুগ্রহ করে কমপক্ষে ৪টি ছবি আপলোড করুন!', 'error');
+      return;
+    }
+
     fetch(`/api/products/${editingProduct.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -327,8 +374,9 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         oldPrice: prodOldPrice || undefined,
         category: prodCategory,
         description: prodDesc,
-        image: prodImage || editingProduct.image,
-        images: [prodImage || editingProduct.image],
+        image: uploadedImages[0] || editingProduct.image,
+        images: uploadedImages,
+        discountPercent: prodDiscountPercent,
         isTrending: prodIsTrending
       })
     })
@@ -339,6 +387,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         setProdOldPrice(undefined);
         setProdDesc('');
         setProdImage('');
+        setProdImages(['', '', '', '']);
+        setProdDiscountPercent(0);
         setProdIsTrending(false);
         fetchAllData();
         showToast('Product updated successfully!', 'success');
@@ -520,6 +570,54 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         console.error('Failed to delete product:', err);
         showToast('Failed to delete product.', 'error');
         setProducts(originalProducts);
+      });
+  };
+
+  // Coupon handlers
+  const handleAddNewCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCode) {
+      showToast('অনুগ্রহ করে কোড টাইপ করুন!', 'error');
+      return;
+    }
+    const newCoupon = {
+      code: couponCode.trim(),
+      discountPercent: Number(couponPercent),
+      description: couponDesc.trim() || `${couponPercent}% Discount Coupon`,
+      isActive: true
+    };
+
+    fetch('/api/coupons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newCoupon)
+    })
+      .then((res) => res.json())
+      .then(() => {
+        setIsAddingCoupon(false);
+        setCouponCode('');
+        setCouponPercent(10);
+        setCouponDesc('');
+        fetchAllData();
+        showToast('নতুন কোপন কোড সফলভাবে যুক্ত করা হয়েছে!', 'success');
+      })
+      .catch((err) => {
+        console.error('Failed to add coupon:', err);
+        showToast('Failed to save coupon.', 'error');
+      });
+  };
+
+  const deleteCoupon = (couponId: string) => {
+    fetch(`/api/coupons/${couponId}`, {
+      method: 'DELETE'
+    })
+      .then(() => {
+        fetchAllData();
+        showToast('কোপন কোডটি সফলভাবে ডিলিট করা হয়েছে!', 'success');
+      })
+      .catch((err) => {
+        console.error('Failed to delete coupon:', err);
+        showToast('Failed to delete coupon.', 'error');
       });
   };
 
@@ -1012,10 +1110,45 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         {/* Quick Operations Hub Grid (With matching colorful interactive dotted circle elements) */}
         <div className="bg-white border border-slate-200 p-5 rounded-3xl space-y-4 shadow-sm text-left">
           
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-            {/* 1. Add Product */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10 gap-4">
+            {/* Orders Queue button */}
             <button 
               onClick={() => {
+                setActiveTab('orders');
+                setOrderDateFilter('all');
+                setOrderStatusFilter('all');
+                showToast('Opened recent orders queue dashboard.', 'info');
+              }}
+              className="bg-[#f0f9ff] border border-sky-100 p-4 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 active:scale-95 group focus:outline-none cursor-pointer h-28"
+            >
+              <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-sky-500 bg-sky-50 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
+                <div className="absolute inset-0.5 rounded-full border border-sky-300/60" />
+                <ClipboardList className="w-5 h-5 text-sky-600 z-10" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Orders Queue</span>
+              <span className="text-[8px] sm:text-[9px] text-sky-700 font-bold block mt-0.5 font-mono">Total: {orders.length}</span>
+            </button>
+
+            {/* All Products button */}
+            <button 
+              onClick={() => {
+                setActiveTab('products');
+                showToast('Opened products inventory catalogue.', 'info');
+              }}
+              className="bg-[#fffbeb] border border-amber-100 p-4 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 active:scale-95 group focus:outline-none cursor-pointer h-28"
+            >
+              <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-amber-500 bg-amber-50 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
+                <div className="absolute inset-0.5 rounded-full border border-amber-300/60" />
+                <Box className="w-5 h-5 text-amber-600 z-10" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">All Products</span>
+              <span className="text-[8px] sm:text-[9px] text-amber-700 font-bold block mt-0.5 font-mono">Items: {products.length}</span>
+            </button>
+
+            {/* Add Product button */}
+            <button 
+              onClick={() => {
+                setIsAddingProduct(true);
                 setEditingProduct(null);
                 setProdName('');
                 setProdCategory(localCategories[0]?.name || 'Furniture');
@@ -1023,37 +1156,22 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 setProdOldPrice(undefined);
                 setProdDesc('');
                 setProdImage('');
+                setProdImages(['', '', '', '']);
+                setProdDiscountPercent(0);
                 setProdIsTrending(false);
-                setIsAddingProduct(true);
-                showToast('Publish Drawer Opened. Load any picture from device gallery!', 'info');
-              }}
-              className="bg-[#fff7ed] border border-orange-100 p-4 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 active:scale-95 group focus:outline-none cursor-pointer h-28"
-            >
-              <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-orange-400 bg-orange-100 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
-                <div className="absolute inset-0.5 rounded-full border border-orange-300/60" />
-                <Plus className="w-5 h-5 text-orange-600 z-10" />
-              </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">Add Product</span>
-              <span className="text-[8px] sm:text-[9px] text-orange-700 font-bold block mt-0.5 font-mono">Device Gallery</span>
-            </button>
-
-            {/* 2. Manage Catalog */}
-            <button 
-              onClick={() => {
-                setActiveTab('products');
-                showToast('Opened products catalog manager.', 'info');
+                showToast('Publish drawer opened. Fill in details to publish!', 'info');
               }}
               className="bg-[#f0fdf4] border border-emerald-100 p-4 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 active:scale-95 group focus:outline-none cursor-pointer h-28"
             >
-              <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-emerald-400 bg-emerald-100 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
+              <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-emerald-500 bg-emerald-50 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
                 <div className="absolute inset-0.5 rounded-full border border-emerald-300/60" />
-                <Box className="w-5 h-5 text-emerald-600 z-10" />
+                <Plus className="w-5 h-5 text-emerald-600 z-10 font-bold" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">All Products</span>
-              <span className="text-[8px] sm:text-[9px] text-emerald-700 font-bold block mt-0.5 font-mono">Total {products.length}</span>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Add Product</span>
+              <span className="text-[8px] sm:text-[9px] text-emerald-700 font-bold block mt-0.5 font-mono">New Upload</span>
             </button>
 
-            {/* 3. Categories */}
+            {/* 1. Categories */}
             <button 
               onClick={() => {
                 setActiveTab('categories');
@@ -1065,11 +1183,11 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-indigo-300/60" />
                 <Tags className="w-5 h-5 text-indigo-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">Categories</span>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Categories</span>
               <span className="text-[8px] sm:text-[9px] text-indigo-700 font-bold block mt-0.5 font-mono">Groups: {localCategories.length}</span>
             </button>
 
-            {/* 4. Slides */}
+            {/* 2. Slides */}
             <button 
               onClick={() => {
                 setActiveTab('hero_banner');
@@ -1081,11 +1199,11 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-purple-300/60" />
                 <Laptop className="w-5 h-5 text-purple-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">Slide Banners</span>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Slide Banners</span>
               <span className="text-[8px] sm:text-[9px] text-purple-700 font-bold block mt-0.5 font-mono">Banners {localSlides.length}</span>
             </button>
 
-            {/* 5. Viewers */}
+            {/* 3. Viewers */}
             <button 
               onClick={() => {
                 setActiveTab('sessions');
@@ -1097,11 +1215,11 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-cyan-300/60" />
                 <Users className="w-5 h-5 text-cyan-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">Viewers List</span>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Viewers List</span>
               <span className="text-[8px] sm:text-[9px] text-cyan-700 font-bold block mt-0.5 font-mono">Active {activeSessions.length}</span>
             </button>
 
-            {/* 6. Security */}
+            {/* 4. Security */}
             <button 
               onClick={() => {
                 setActiveTab('security');
@@ -1113,11 +1231,11 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-pink-300/60" />
                 <Lock className="w-5 h-5 text-pink-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">Settings Code</span>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Settings Code</span>
               <span className="text-[8px] sm:text-[9px] text-pink-700 font-bold block mt-0.5 font-mono">Key Settings</span>
             </button>
 
-            {/* 7. Shipping Areas */}
+            {/* 5. Shipping Areas */}
             <button 
               onClick={() => {
                 setActiveTab('shipping_areas');
@@ -1129,8 +1247,40 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <div className="absolute inset-0.5 rounded-full border border-amber-300/60" />
                 <Truck className="w-5 h-5 text-amber-600 z-10" />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight">Shipping Zones</span>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Shipping Zones</span>
               <span className="text-[8px] sm:text-[9px] text-amber-700 font-bold block mt-0.5 font-mono">Zones {shippingAreas.length}</span>
+            </button>
+
+            {/* 6. Chat Help Desk */}
+            <button 
+              onClick={() => {
+                setActiveTab('help_desk');
+                showToast('Opened store support details.', 'info');
+              }}
+              className="bg-[#f0fdf4] border border-emerald-100 p-4 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 active:scale-95 group focus:outline-none cursor-pointer h-28"
+            >
+              <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-emerald-400 bg-emerald-100 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
+                <div className="absolute inset-0.5 rounded-full border border-emerald-300/60" />
+                <MessageCircle className="w-5 h-5 text-emerald-600 z-10" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Chat Help Desk</span>
+              <span className="text-[8px] sm:text-[9px] text-emerald-700 font-bold block mt-0.5 font-mono">Direct Support</span>
+            </button>
+
+            {/* 7. Coupons Manager */}
+            <button 
+              onClick={() => {
+                setActiveTab('coupons');
+                showToast('Opened discount coupons manager.', 'info');
+              }}
+              className="bg-[#faf5ff] border border-violet-100 p-4 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 active:scale-95 group focus:outline-none cursor-pointer h-28"
+            >
+              <div className="relative flex items-center justify-center w-11 h-11 rounded-full border border-dashed border-violet-400 bg-violet-100 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
+                <div className="absolute inset-0.5 rounded-full border border-violet-300/60" />
+                <Ticket className="w-5 h-5 text-violet-600 z-10" />
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-tight block leading-tight font-sans">Coupons List</span>
+              <span className="text-[8px] sm:text-[9px] text-violet-700 font-bold block mt-0.5 font-mono">Total {couponsList.length}</span>
             </button>
           </div>
         </div>
@@ -1143,18 +1293,21 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-md">
           
           {/* Header indicator with the yellow bulb and clicked function's name */}
-          <div className="flex items-center gap-2.5 pb-3.5 mb-5 border-b border-slate-200 text-left">
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-            <span className="text-sm font-black uppercase tracking-wider text-slate-800 font-sans">
-              {activeTab === 'orders' && 'Orders Management'}
-              {activeTab === 'products' && 'Products Inventory'}
-              {activeTab === 'sessions' && 'Viewers List'}
-              {activeTab === 'hero_banner' && 'Slide Banners'}
-              {activeTab === 'categories' && 'Categories Catalog'}
-              {activeTab === 'security' && 'Security Settings'}
-              {activeTab === 'shipping_areas' && 'Shipping Zones & Charges Manager'}
-            </span>
-          </div>
+          {activeTab !== 'products' && (
+            <div className="flex items-center gap-2.5 pb-3.5 mb-5 border-b border-slate-200 text-left">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <span className="text-sm font-black uppercase tracking-wider text-slate-800 font-sans">
+                {activeTab === 'orders' && 'Orders Management'}
+                {activeTab === 'sessions' && 'Viewers List'}
+                {activeTab === 'hero_banner' && 'Slide Banners'}
+                {activeTab === 'categories' && 'Categories Catalog'}
+                {activeTab === 'security' && 'Security Settings'}
+                {activeTab === 'shipping_areas' && 'Shipping Zones & Charges Manager'}
+                {activeTab === 'help_desk' && 'Chat Store Help Desk'}
+                {activeTab === 'coupons' && 'Discount Coupons & Promo Codes'}
+              </span>
+            </div>
+          )}
 
           {/* 1. ORDERS TAB */}
           {activeTab === 'orders' && (
@@ -1305,10 +1458,10 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
           {activeTab === 'products' && (
             <div className="space-y-5">
               {/* Header block with orange dot and Add Product button as shown in user screenshot */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] ring-4 ring-[#f59e0b]/20" />
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#1e293b] tracking-wider font-sans uppercase">
+              <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#ff9900]" />
+                  <h3 className="text-sm sm:text-base font-black text-[#1e293b] tracking-wider font-sans uppercase">
                     PRODUCTS INVENTORY
                   </h3>
                 </div>
@@ -1322,12 +1475,14 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     setProdOldPrice(undefined);
                     setProdDesc('');
                     setProdImage('');
+                    setProdImages(['', '', '', '']);
+                    setProdDiscountPercent(0);
                     setProdIsTrending(false);
                     showToast('Publish drawer opened. Fill in details to publish!', 'info');
                   }}
-                  className="bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-black py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition duration-150 active:scale-95 shadow-md shadow-[#f59e0b]/10 cursor-pointer focus:outline-none"
+                  className="bg-[#ff9900] hover:bg-amber-500 text-black text-xs font-black py-2.5 px-4 rounded-xl flex items-center justify-center gap-1 transition duration-150 active:scale-95 cursor-pointer focus:outline-none"
                 >
-                  <Plus className="w-3.5 h-3.5 text-white stroke-[3px]" />
+                  <span className="text-sm font-black text-black">+</span>
                   <span>Add Product</span>
                 </button>
               </div>
@@ -1399,6 +1554,17 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                               setProdOldPrice(prod.oldPrice);
                               setProdDesc(prod.description || '');
                               setProdImage(prod.image);
+                              
+                              // Handle edit fallback to 4 items in state
+                              const origImages = Array.isArray(prod.images) ? prod.images : [];
+                              const padded: string[] = ['', '', '', ''];
+                              padded[0] = prod.image || '';
+                              for (let i = 1; i < 4; i++) {
+                                padded[i] = origImages[i] || '';
+                              }
+                              setProdImages(padded);
+                              setProdDiscountPercent(prod.discountPercent || 0);
+                              
                               setProdIsTrending(!!prod.isTrending);
                             }}
                             className="px-2.5 py-1.5 border border-slate-150 bg-[#f8fafc] hover:bg-slate-100 rounded-lg text-slate-700 hover:text-slate-900 transition text-[10px] font-black cursor-pointer shadow-sm focus:outline-none"
@@ -1951,6 +2117,191 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
             </div>
           )}
 
+          {/* 8. HELP DESK SETTINGS TAB */}
+          {activeTab === 'help_desk' && (
+            <div className="space-y-6 text-left">
+              <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center gap-3">
+                <MessageCircle className="w-8 h-8 text-emerald-600 shrink-0" />
+                <div>
+                  <h4 className="text-sm font-black text-emerald-800 uppercase">Chat with Store Help Desk Settings</h4>
+                  <p className="text-[10px] text-emerald-600 font-semibold leading-relaxed">
+                    Update the dynamic help desk support properties. Any changes will immediately synchronize for all active users browsing the store in real-time.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-150 rounded-2xl p-5 space-y-4 shadow-sm">
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-slate-700 block uppercase">Help Desk Phone Number (WhatsApp)</label>
+                  <p className="text-[10px] text-slate-400 mb-1">Enter numbers only without spaces or symbols (e.g., 01715838191)</p>
+                  <input 
+                    type="text"
+                    value={storeContact.phone}
+                    onChange={(e) => setStoreContact(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-bold"
+                    placeholder="e.g. 01715838191"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-slate-700 block uppercase">Hours of Operation / Availability Text</label>
+                  <input 
+                    type="text"
+                    value={storeContact.hours}
+                    onChange={(e) => setStoreContact(prev => ({ ...prev, hours: e.target.value }))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-semibold"
+                    placeholder="e.g. Available 24/7 for support"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      if (!storeContact.phone) {
+                        showToast('Please specify a valid contact phone number!', 'error');
+                        return;
+                      }
+                      
+                      fetch('/api/store-contact', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          phone: storeContact.phone,
+                          whatsappUrl: `https://wa.me/88${storeContact.phone}`,
+                          hours: storeContact.hours
+                        })
+                      })
+                        .then((res) => res.json())
+                        .then((data) => {
+                          if (data && data.phone) {
+                            setStoreContact(data);
+                            showToast('Store help desk number successfully updated and synchronized!', 'success');
+                          }
+                        })
+                        .catch((err) => {
+                          console.error('Failed to save help desk contact:', err);
+                          showToast('Failed to save settings to server.', 'error');
+                        });
+                    }}
+                    className="w-full bg-[#ff9900] hover:bg-amber-600 text-black font-black text-xs py-3 px-4 rounded-xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center justify-center gap-2 animate-fade-in"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>SAVE HELP DESK SETTINGS</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 9. COUPONS SETTINGS TAB */}
+          {activeTab === 'coupons' && (
+            <div className="space-y-6 text-left">
+              <div className="bg-violet-50 border border-violet-100 p-4 rounded-2xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Ticket className="w-8 h-8 text-violet-600 shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-black text-violet-800 uppercase">Discount Coupons Manager</h4>
+                    <p className="text-[10px] text-violet-600 font-semibold leading-relaxed">
+                      Create percentage-based discount coupons for buyers to apply during checkout.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCoupon(!isAddingCoupon)}
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-black text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isAddingCoupon ? 'Close Form' : 'Add Coupon'}</span>
+                </button>
+              </div>
+
+              {/* Add Coupon form */}
+              {isAddingCoupon && (
+                <form onSubmit={handleAddNewCoupon} className="bg-white border border-slate-150 rounded-2xl p-5 space-y-4 shadow-sm animate-fade-in">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">Add New Active Coupon</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-600 uppercase">Coupon Code</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-bold uppercase focus:outline-none focus:border-violet-500"
+                        placeholder="e.g. SAVE25"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-650 uppercase">Discount Percent (%)</label>
+                      <select 
+                        value={couponPercent}
+                        onChange={(e) => setCouponPercent(Number(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-bold focus:outline-none focus:border-violet-500 shadow-sm"
+                      >
+                        {[5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70].map(val => (
+                          <option key={val} value={val}>{val}% Discount</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-600 uppercase">Description / Meta Text</label>
+                    <input 
+                      type="text"
+                      value={couponDesc}
+                      onChange={(e) => setCouponDesc(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-violet-500"
+                      placeholder="e.g. Save 25% on purchase"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black text-xs py-2.5 px-4 rounded-xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>CREATE COUPON CODE</span>
+                  </button>
+                </form>
+              )}
+
+              {/* Coupons table/list */}
+              <div className="bg-white border border-slate-150 rounded-2xl overflow-hidden shadow-sm">
+                <div className="divide-y divide-slate-150">
+                  {couponsList.map((coupon: any) => (
+                    <div key={coupon.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition duration-75">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-violet-100 text-violet-800 font-mono text-xs font-black px-2.5 py-1 rounded-lg border border-violet-200">
+                            {coupon.code}
+                          </span>
+                          <span className="text-[#15803d] font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                            {coupon.discountPercent}% Off
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-semibold">{coupon.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => deleteCoupon(coupon.id)}
+                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-xl transition cursor-pointer"
+                        title="Delete instruction"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {couponsList.length === 0 && (
+                    <div className="text-center py-8 text-xs text-slate-400 font-sans">
+                      No coupon code defined. Click "Add Coupon" to configure code.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -2044,51 +2395,97 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 />
               </div>
 
-              <div className="space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-205">
-                <label className="font-bold text-slate-500 block mb-1">Mobile Gallery Photo * (Select image file from device gallery)</label>
-                <div className="flex items-center gap-3">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    id="mobile-product-file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        compressAndReduceImage(file, (base64) => {
-                          setProdImage(base64);
-                          showToast('The file has been uploaded successfully', 'success');
-                        });
-                      }
-                    }}
-                  />
-                  <label 
-                    htmlFor="mobile-product-file"
-                    className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-3 py-2 rounded-lg cursor-pointer text-[10px] uppercase tracking-wide transition-all shrink-0"
-                  >
-                    Choose Photo
-                  </label>
-                  <div className="flex-1 text-[10px] text-slate-510 truncate">
-                    {prodImage ? 'Photo loaded ✓' : 'No photo uploaded'}
-                  </div>
+               {/* Offer percent discount during product upload or edit */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-500 block">Offer Special Store Discount (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  required
+                  placeholder="Type discount percent (e.g. 15)"
+                  value={prodDiscountPercent}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setProdDiscountPercent(Math.min(100, Math.max(0, val || 0)));
+                  }}
+                  className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none focus:border-amber-500 shadow-sm text-xs font-mono"
+                />
+                <div className="bg-amber-50/50 border border-amber-100 rounded-lg p-2.5 mt-1.5 text-[10px] text-slate-650 leading-normal space-y-1">
+                  <p className="font-semibold text-slate-700">Live Automatic Subtraction:</p>
+                  <p>• Regular Price: <span className="font-bold text-slate-800 font-mono">{prodPrice ? prodPrice.toLocaleString() : '0'} AED</span></p>
+                  <p>• Off Discount: <span className="font-bold text-red-600 font-mono">{prodDiscountPercent}%</span> (-{Math.round(prodPrice * (prodDiscountPercent / 100)).toLocaleString()} AED)</p>
+                  <p>• Final Buyer Price: <span className="font-black text-emerald-700 font-mono">{Math.round(prodPrice * (1 - prodDiscountPercent / 100)).toLocaleString()} AED</span></p>
                 </div>
-                {prodImage && (
-                  <div className="mt-2 border border-slate-200 p-1 rounded-lg bg-white inline-block relative">
-                    <img 
-                      src={prodImage} 
-                      alt="Preview" 
-                      className="w-20 h-14 rounded object-cover" 
-                      referrerPolicy="no-referrer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setProdImage('')}
-                      className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5 hover:bg-rose-700 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+              </div>
+
+              {/* 4 Multi-image upload slots */}
+              <div className="space-y-3 bg-slate-50 p-2.5 rounded-xl border border-slate-205">
+                <span className="font-black text-slate-750 block uppercase tracking-wide text-[9px] mb-1.5 border-b border-slate-200 pb-1">
+                  Product Images (Upload at least 4 photos)
+                </span>
+                {[0, 1, 2, 3].map((idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-slate-500 block text-[9px] uppercase">
+                        {idx === 0 ? 'Main Cover Photo *' : `Extra Gallery Photo ${idx + 1}`}
+                      </label>
+                      {prodImages[idx] && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = [...prodImages];
+                            updated[idx] = '';
+                            setProdImages(updated);
+                            if (idx === 0) setProdImage('');
+                          }}
+                          className="text-red-500 text-[9px] font-bold hover:underline"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        id={`prod-file-${idx}`}
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            compressAndReduceImage(file, (base64) => {
+                              const updated = [...prodImages];
+                              updated[idx] = base64;
+                              setProdImages(updated);
+                              if (idx === 0) setProdImage(base64);
+                              showToast(`Photo ${idx + 1} loaded successfully!`, 'success');
+                            });
+                          }
+                        }}
+                      />
+                      <label 
+                        htmlFor={`prod-file-${idx}`}
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-2.5 py-1.5 rounded text-[9px] uppercase tracking-wide cursor-pointer select-none transition"
+                      >
+                        Choose Photo
+                      </label>
+                      <div className="flex-1 text-[9px] text-slate-500 truncate">
+                        {prodImages[idx] ? 'Photo Loaded ✓' : 'No photo chosen'}
+                      </div>
+                    </div>
+                    {prodImages[idx] && (
+                      <div className="inline-block border border-slate-200 p-0.5 rounded bg-white mt-1">
+                        <img 
+                          src={prodImages[idx]} 
+                          alt={`Slot ${idx + 1}`} 
+                          className="w-12 h-9 rounded object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
 
               <div className="flex items-center gap-2 py-1 select-none">
@@ -2228,13 +2625,13 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                   value={editingOrder.note || ''}
                   onChange={(e) => setEditingOrder({ ...editingOrder, note: e.target.value })}
                   placeholder="Internal courier references, etc."
-                  className="w-full bg-white border border-slate-300 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
+                  className="w-full bg-white border border-slate-350 rounded p-2 text-slate-850 outline-none focus:border-amber-500"
                 />
               </div>
 
               <button 
                 type="submit"
-                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2 rounded transition-colors text-center cursor-pointer"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 rounded-lg transition-colors text-center cursor-pointer shadow-sm text-xs mt-3"
               >
                 Save Changes
               </button>
@@ -2245,98 +2642,10 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
       {/* --- VIEW DETAILED INVOICE MODAL OVERLAY --- */}
       {viewingOrderInvoice && (
-        <div className="fixed inset-0 bg-slate-950/85 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white text-slate-800 rounded-2xl p-6 shadow-2xl relative max-w-lg w-full text-left flex flex-col justify-between">
-            <button 
-              onClick={() => setViewingOrderInvoice(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-black border border-slate-100 p-1 rounded-full"
-            >
-              <X className="w-5 h-5 text-slate-600" />
-            </button>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-start border-b pb-3 border-slate-100">
-                <div>
-                  <img
-                    src="https://i.postimg.cc/63KXZNcz/20260530-101216.png"
-                    alt="RK Furniture Logo"
-                    className="h-8 w-auto object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Sandwip, Chittagong, Bangladesh</p>
-                </div>
-                <div className="text-right">
-                  <h3 className="font-black text-slate-900 text-xs uppercase">INVOICE SHEET</h3>
-                  <span className="text-[10px] text-slate-500 block">#{viewingOrderInvoice.id}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">SHIPPED TO:</span>
-                  <p className="font-extrabold text-slate-800">{viewingOrderInvoice.customerName}</p>
-                  <p className="text-slate-500 font-mono text-[11px] mt-0.5">{viewingOrderInvoice.customerMobile}</p>
-                  <p className="text-slate-500 mt-1 leading-relaxed text-[11px]">{viewingOrderInvoice.deliveryAddress}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">SUMMARY DETAILS:</span>
-                  <p className="text-slate-600">Date: <span className="font-bold text-slate-800">{viewingOrderInvoice.date}</span></p>
-                  <p className="text-slate-600 mt-0.5">Method: <span className="font-bold text-slate-800">{viewingOrderInvoice.paymentMethod}</span></p>
-                  <p className="text-slate-600 mt-0.5">Status: <span className="font-extrabold text-amber-600 capitalize">{viewingOrderInvoice.status}</span></p>
-                </div>
-              </div>
-
-              {/* Items details table */}
-              <div className="border border-slate-100 rounded-xl overflow-hidden mt-4">
-                <div className="bg-slate-50 p-2 text-[10px] uppercase font-extrabold text-slate-400 flex justify-between tracking-wider">
-                  <span className="flex-1">Ordered Item</span>
-                  <span className="w-16 text-center">Qty</span>
-                  <span className="w-20 text-right">Price</span>
-                </div>
-                <div className="divide-y divide-slate-100 max-h-40 overflow-y-auto p-2">
-                  {viewingOrderInvoice.products.map((item, id) => (
-                    <div key={id} className="py-2 flex items-center justify-between text-xs">
-                      <span className="flex-1 font-bold text-slate-800 leading-normal">{item.product.name}</span>
-                      <span className="w-16 text-center text-slate-500 font-bold">{item.quantity}</span>
-                      <span className="w-20 text-right font-mono font-bold text-slate-700">{item.product.price.toLocaleString()} AED</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Totals summaries */}
-              <div className="flex flex-col items-end gap-1 text-xs text-slate-600 bg-slate-50/50 p-3 rounded-xl border border-slate-100 mt-2">
-                <div className="w-full flex justify-between sm:max-w-[200px]">
-                  <span>Subtotal:</span>
-                  <span className="font-mono text-slate-700">{(viewingOrderInvoice.total - viewingOrderInvoice.shippingCharge).toLocaleString()} AED</span>
-                </div>
-                <div className="w-full flex justify-between sm:max-w-[200px]">
-                  <span>Shipping charge:</span>
-                  <span className="font-mono text-slate-700">{viewingOrderInvoice.shippingCharge.toLocaleString()} AED</span>
-                </div>
-                <div className="w-full flex justify-between sm:max-w-[200px] border-t pt-1.5 font-extrabold text-slate-900 text-sm">
-                  <span>Grand Total:</span>
-                  <span className="font-mono text-[#c25927]">{viewingOrderInvoice.total.toLocaleString()} AED</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 mt-4">
-              <button 
-                onClick={() => window.print()}
-                className="bg-[#c25927] hover:bg-[#b04d20] text-white font-extrabold text-xs px-4 py-2 rounded-xl transition"
-              >
-                Print Invoice
-              </button>
-              <button 
-                onClick={() => setViewingOrderInvoice(null)}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs px-4 py-2 rounded-xl transition"
-              >
-                Close View
-              </button>
-            </div>
-          </div>
-        </div>
+        <OrderReceipt 
+          order={viewingOrderInvoice} 
+          onClose={() => setViewingOrderInvoice(null)} 
+        />
       )}
     </div>
   );

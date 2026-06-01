@@ -8,6 +8,7 @@ export interface Product {
   images: string[];
   category: string;
   description?: string;
+  discountPercent?: number;
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'completed';

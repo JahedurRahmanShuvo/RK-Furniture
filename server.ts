@@ -52,6 +52,23 @@ const USERS_DB_PATH = path.join(process.cwd(), 'db_users.json');
 const SLIDES_DB_PATH = path.join(process.cwd(), 'db_slides.json');
 const CATEGORIES_DB_PATH = path.join(process.cwd(), 'db_categories.json');
 const SHIPPING_AREAS_DB_PATH = path.join(process.cwd(), 'db_shipping_areas.json');
+const STORE_CONTACT_DB_PATH = path.join(process.cwd(), 'db_store_contact.json');
+const COUPONS_DB_PATH = path.join(process.cwd(), 'db_coupons.json');
+
+const INITIAL_STORE_CONTACT = [
+  {
+    id: 'contact_info',
+    phone: '01715838191',
+    whatsappUrl: 'https://wa.me/8801715838191',
+    hours: 'Available 24/7 for support'
+  }
+];
+
+const INITIAL_COUPONS = [
+  { id: 'coupon_1', code: 'RK10', discountPercent: 10, description: '10% OFF Discount Coupon', isActive: true },
+  { id: 'coupon_2', code: 'SUPER20', discountPercent: 20, description: 'Super 20% discount coupon', isActive: true },
+  { id: 'coupon_3', code: 'EID30', discountPercent: 30, description: 'Eid Special 30% discount coupon', isActive: true }
+];
 
 // Helper function to read/write JSON databases
 function readJSONFile(filePath: string, defaultValue: any) {
@@ -557,6 +574,71 @@ app.delete('/api/shipping-areas/:id', async (req, res) => {
   writeJSONFile(SHIPPING_AREAS_DB_PATH, areas);
   await deleteDocFromFirestore('shipping_areas', id);
   res.json({ success: true, message: 'Shipping area deleted' });
+});
+
+// STORE CONTACT HELP DESK ENDPOINTS
+app.get('/api/store-contact', async (req, res) => {
+  try {
+    const contacts = await loadCollectionFromFirestore('store_contact', STORE_CONTACT_DB_PATH, INITIAL_STORE_CONTACT);
+    res.json(contacts[0] || INITIAL_STORE_CONTACT[0]);
+  } catch (err) {
+    console.error('Failed to get store contact:', err);
+    res.status(500).json({ error: 'Failed to find help desk number' });
+  }
+});
+
+app.post('/api/store-contact', async (req, res) => {
+  try {
+    const { phone, whatsappUrl, hours } = req.body;
+    const updatedContact = {
+      id: 'contact_info',
+      phone: phone || '01715838191',
+      whatsappUrl: whatsappUrl || `https://wa.me/88${phone || '01715838191'}`,
+      hours: hours || 'Available 24/7 for support'
+    };
+    await setDoc(doc(db, 'store_contact', 'contact_info'), updatedContact);
+    writeJSONFile(STORE_CONTACT_DB_PATH, [updatedContact]);
+    res.json(updatedContact);
+  } catch (err) {
+    console.error('Failed to update store contact:', err);
+    res.status(500).json({ error: 'Failed to update help desk details' });
+  }
+});
+
+// COUPONS ENDPOINTS
+app.get('/api/coupons', async (req, res) => {
+  const coupons = await loadCollectionFromFirestore('coupons', COUPONS_DB_PATH, INITIAL_COUPONS);
+  res.json(coupons);
+});
+
+app.post('/api/coupons', async (req, res) => {
+  const coupons = await loadCollectionFromFirestore('coupons', COUPONS_DB_PATH, INITIAL_COUPONS);
+  const newCoupon = req.body;
+  if (!newCoupon.id) {
+    newCoupon.id = 'coupon_' + Date.now();
+  }
+  newCoupon.discountPercent = Number(newCoupon.discountPercent);
+  newCoupon.isActive = newCoupon.isActive !== false;
+  
+  const existingIndex = coupons.findIndex((c: any) => c.id === newCoupon.id || c.code.toLowerCase() === newCoupon.code.toLowerCase());
+  if (existingIndex !== -1) {
+    coupons[existingIndex] = { ...coupons[existingIndex], ...newCoupon };
+  } else {
+    coupons.push(newCoupon);
+  }
+  
+  writeJSONFile(COUPONS_DB_PATH, coupons);
+  await saveDocToFirestore('coupons', newCoupon.id, newCoupon);
+  res.status(201).json(newCoupon);
+});
+
+app.delete('/api/coupons/:id', async (req, res) => {
+  const { id } = req.params;
+  let coupons = await loadCollectionFromFirestore('coupons', COUPONS_DB_PATH, INITIAL_COUPONS);
+  coupons = coupons.filter((c: any) => c.id !== id);
+  writeJSONFile(COUPONS_DB_PATH, coupons);
+  await deleteDocFromFirestore('coupons', id);
+  res.json({ success: true, message: 'Coupon deleted successfully' });
 });
 
 // 4. ACTIVE SESSIONS MONITORING

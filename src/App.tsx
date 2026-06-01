@@ -10,6 +10,7 @@ import {
   Home,
   LayoutGrid,
   CheckCircle,
+  Check,
   Clock,
   MapPin,
   Phone,
@@ -29,7 +30,10 @@ import {
   Send,
   Eye,
   LogOut,
-  UserCheck
+  UserCheck,
+  Ticket,
+  ClipboardList,
+  IdCard
 } from 'lucide-react';
 
 import { INITIAL_PRODUCTS, SHIPPING_RATES, STORE_CONTACT } from './data';
@@ -124,6 +128,16 @@ export default function App() {
     { id: 'ship_4', name: 'Other Emirates', charge: 60 }
   ]);
 
+  const [storeContact, setStoreContact] = useState<{ phone: string; whatsappUrl: string; hours: string }>({
+    phone: '01715838191',
+    whatsappUrl: 'https://wa.me/8801715838191',
+    hours: 'Available 24/7 for support'
+  });
+
+  const [appLoading, setAppLoading] = useState(true);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [promoDiscountPercent, setPromoDiscountPercent] = useState<number>(0);
+
   // Synchronize orders, products, and users with global server databases with rapid real-time polling
   const syncDatabaseGlobal = () => {
     fetch('/api/products')
@@ -181,15 +195,41 @@ export default function App() {
         }
       })
       .catch((err) => console.error('Failed to sync shipping areas from server:', err));
+
+    fetch('/api/store-contact')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.phone) {
+          setStoreContact(data);
+        }
+      })
+      .catch((err) => console.error('Failed to sync store contact:', err));
+
+    fetch('/api/coupons')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCoupons(data);
+        }
+      })
+      .catch((err) => console.error('Failed to sync coupons from server:', err));
   };
 
   useEffect(() => {
     // Initial fetch on mount
     syncDatabaseGlobal();
     
+    // Show the gorgeous loading screen for 1200ms when refreshing or visiting to fulfill requirement precisely
+    const timer = setTimeout(() => {
+      setAppLoading(false);
+    }, 1200);
+
     // Set up rapid background real-time synchronization every 3.5 seconds
     const interval = setInterval(syncDatabaseGlobal, 3500);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
   }, []);
 
   // --- Active Viewer Session Heartbeat ---
@@ -305,6 +345,7 @@ export default function App() {
   const [viewReceiptOrder, setViewReceiptOrder] = useState<Order | null>(null);
 
   // Checkout inputs
+  const [addedProductPopup, setAddedProductPopup] = useState<{ productId: string; qty: number } | null>(null);
   const [checkoutName, setCheckoutName] = useState('');
   const [checkoutMobile, setCheckoutMobile] = useState('');
   const [checkoutAddress, setCheckoutAddress] = useState('');
@@ -316,6 +357,23 @@ export default function App() {
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoMessage, setPromoMessage] = useState('');
   const [latestPlacedOrder, setLatestPlacedOrder] = useState<Order | null>(null);
+
+  // Auto-fill checkout details based on logged-in user profile & shipping locations
+  useEffect(() => {
+    if (view === 'checkout') {
+      if (user && user.isLoggedIn) {
+        if (!checkoutName) {
+          setCheckoutName(user.name || '');
+        }
+        if (!checkoutMobile) {
+          setCheckoutMobile(user.phone || '');
+        }
+        if (!checkoutAddress && addresses && addresses.length > 0) {
+          setCheckoutAddress(addresses[0].address || '');
+        }
+      }
+    }
+  }, [view, user, addresses, checkoutName, checkoutMobile, checkoutAddress]);
 
   // Auth form states
   const [loginPhone, setLoginPhone] = useState('');
@@ -408,6 +466,18 @@ export default function App() {
     }
   };
 
+  // Helper to resolve currently correct dynamic prices for display
+  const getProductPrices = (prod: Product) => {
+    const hasDiscount = !!prod.discountPercent && prod.discountPercent > 0;
+    const currentPrice = hasDiscount 
+      ? Math.round(prod.price * (1 - prod.discountPercent / 100))
+      : prod.price;
+    const oldPrice = hasDiscount 
+      ? prod.price 
+      : (prod.oldPrice || undefined);
+    return { currentPrice, oldPrice, discountPercent: prod.discountPercent };
+  };
+
   // --- Helpers for Cart actions ---
   const addToCart = (productId: string, qty: number = 1) => {
     setCart((prev) => {
@@ -419,8 +489,8 @@ export default function App() {
       }
       return [...prev, { productId, quantity: qty }];
     });
-    // Visual cue
-    setCartDrawerOpen(true);
+    // Trigger the beautiful success popup notification matching screenshot
+    setAddedProductPopup({ productId, qty });
   };
 
   const removeFromCart = (productId: string) => {
@@ -447,11 +517,12 @@ export default function App() {
     cart.forEach((item) => {
       const product = products.find((p) => p.id === item.productId);
       if (product) {
-        subtotal += product.price * item.quantity;
+        const { currentPrice } = getProductPrices(product);
+        subtotal += currentPrice * item.quantity;
       }
     });
 
-    const discount = promoApplied ? subtotal * 0.1 : 0; // 10% coupon
+    const discount = promoApplied ? subtotal * (promoDiscountPercent / 100) : 0; // Dynamic coupon discount percentage
     const selectedAreaObj = shippingAreas.find((a) => a.id === checkoutArea || a.name === checkoutArea);
     const shippingCharge = selectedAreaObj ? selectedAreaObj.charge : (shippingAreas[0]?.charge || 0);
     const total = subtotal - discount + shippingCharge;
@@ -682,11 +753,17 @@ export default function App() {
 
   // Promo Code trigger checks
   const handleApplyPromo = () => {
-    if (promoInput.toLowerCase() === 'rk10') {
+    if (!promoInput) return;
+    const cleanCode = promoInput.trim().toLowerCase();
+    const found = coupons.find((c: any) => c.code.toLowerCase() === cleanCode && c.isActive);
+    if (found) {
       setPromoApplied(true);
-      setPromoMessage('Promo code applied! 10% discount subtracted.');
+      setPromoDiscountPercent(found.discountPercent);
+      setPromoMessage(`অভিনন্দন! আপনার "${found.code}" কোডটি সফলভাবে যুক্ত হয়েছে। আপনি ${found.discountPercent}% ছাড় পেয়েছেন।`);
     } else {
-      setPromoMessage('Invalid promo code. Play RK10 for testing!');
+      setPromoApplied(false);
+      setPromoDiscountPercent(0);
+      setPromoMessage('ভুল কিংবা নিষ্ক্রিয় কোড! অনুগ্রহ করে যাচাই করে পুনরায় চেষ্টা করুন।');
     }
   };
 
@@ -803,6 +880,18 @@ export default function App() {
       })
       .catch((err) => console.error('Failed to sync products from admin page:', err));
   };
+
+  if (appLoading) {
+    return (
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-[9999]">
+        <div className="relative flex flex-col items-center select-none">
+          {/* Circular spinner matching user image precisely: light-grey circle on bottom, dark-arc spinning on top */}
+          <div className="w-16 h-16 rounded-full border-[6px] border-[#e2e8f0] border-t-[#222222] animate-spin mb-5" />
+          <span className="text-[#222222] text-xl font-extrabold tracking-wide font-sans">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (view === 'admin_dashboard' && user.isLoggedIn && user.phone === '01700000000') {
     return (
@@ -956,16 +1045,21 @@ export default function App() {
                               </div>
 
                               {/* Price stack with optional strikeout */}
-                              <div className="flex items-center flex-wrap gap-2 text-left font-mono">
-                                <span className="text-[#c25927] font-black text-xs sm:text-sm">
-                                  {prod.price.toLocaleString()} AED
-                                </span>
-                                {prod.oldPrice && (
-                                  <span className="text-slate-400 font-bold line-through text-[10px] sm:text-xs">
-                                    {prod.oldPrice.toLocaleString()} AED
-                                  </span>
-                                )}
-                              </div>
+                              {(() => {
+                                const { currentPrice, oldPrice } = getProductPrices(prod);
+                                return (
+                                  <div className="flex items-center flex-wrap gap-2 text-left font-mono">
+                                    <span className="text-[#c25927] font-black text-xs sm:text-sm">
+                                      {currentPrice.toLocaleString()} AED
+                                    </span>
+                                    {oldPrice && (
+                                      <span className="text-slate-400 font-bold line-through text-[10px] sm:text-xs">
+                                        {oldPrice.toLocaleString()} AED
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
 
                               {/* Interactive actions identical to premium trending style */}
                               <div className="space-y-1.5 pt-1">
@@ -1041,23 +1135,6 @@ export default function App() {
                             Browse Collections
                           </button>
                         </div>
-                        {/* Arrow selectors */}
-                        {slides.length > 1 && (
-                          <div className="absolute right-4 bottom-4 flex gap-1 z-20">
-                            <button
-                              onClick={() => setActiveSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1))}
-                              className="p-1 rounded bg-black/40 text-white/80 hover:text-white"
-                            >
-                              <ArrowLeft className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setActiveSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))}
-                              className="p-1 rounded bg-black/40 text-white/80 hover:text-white"
-                            >
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
                       </div>
                     );
                   })()}
@@ -1131,16 +1208,21 @@ export default function App() {
                               </div>
 
                               {/* Price tier with comparison */}
-                              <div className="flex items-center gap-2 text-left">
-                                <span className="text-[#c25927] font-black text-base sm:text-lg">
-                                  {prod.price.toLocaleString()} AED
-                                </span>
-                                {prod.oldPrice && (
-                                  <span className="text-slate-400 font-bold line-through text-xs">
-                                    {prod.oldPrice.toLocaleString()} AED
-                                  </span>
-                                )}
-                              </div>
+                              {(() => {
+                                const { currentPrice, oldPrice } = getProductPrices(prod);
+                                return (
+                                  <div className="flex items-center gap-2 text-left">
+                                    <span className="text-[#c25927] font-black text-base sm:text-lg">
+                                      {currentPrice.toLocaleString()} AED
+                                    </span>
+                                    {oldPrice && (
+                                      <span className="text-slate-400 font-bold line-through text-xs">
+                                        {oldPrice.toLocaleString()} AED
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
 
                               {/* Action buttons mirroring user screenshot */}
                               <div className="space-y-1.5 pt-1.5">
@@ -1267,9 +1349,21 @@ export default function App() {
 
                           {/* Price & action stack */}
                           <div className="space-y-2 text-left">
-                            <div className="text-[#c25927] font-extrabold text-base sm:text-lg">
-                              {prod.price.toLocaleString()} AED
-                            </div>
+                            {(() => {
+                              const { currentPrice, oldPrice } = getProductPrices(prod);
+                              return (
+                                <div className="flex items-center gap-2 flex-wrap text-left font-mono">
+                                  <span className="text-[#c25927] font-extrabold text-xs sm:text-sm">
+                                    {currentPrice.toLocaleString()} AED
+                                  </span>
+                                  {oldPrice && (
+                                    <span className="text-slate-400 font-bold line-through text-[10px] sm:text-xs">
+                                      {oldPrice.toLocaleString()} AED
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
 
                             <div className="grid grid-cols-2 gap-1.5">
                               <button
@@ -1395,16 +1489,21 @@ export default function App() {
                         </div>
 
                         {/* Price centered with cross-out */}
-                        <div className="flex justify-center items-center gap-1.5 flex-wrap">
-                          <span className="text-[#c25927] font-extrabold text-xs sm:text-sm">
-                            {prod.price.toLocaleString()} AED
-                          </span>
-                          {prod.oldPrice && (
-                            <span className="text-slate-400 font-semibold line-through text-[10px] sm:text-xs">
-                              {prod.oldPrice.toLocaleString()} AED
-                            </span>
-                          )}
-                        </div>
+                        {(() => {
+                          const { currentPrice, oldPrice } = getProductPrices(prod);
+                          return (
+                            <div className="flex justify-center items-center gap-1.5 flex-wrap">
+                              <span className="text-[#c25927] font-extrabold text-xs sm:text-sm">
+                                {currentPrice.toLocaleString()} AED
+                              </span>
+                              {oldPrice && (
+                                <span className="text-slate-400 font-semibold line-through text-[10px] sm:text-xs">
+                                  {oldPrice.toLocaleString()} AED
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Button stack mimicking exactly the layout */}
                         <div className="space-y-1.5 pt-1">
@@ -1636,17 +1735,20 @@ export default function App() {
 
                     {/* Promo/Coupon entry field */}
                     <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Promo Code (e.g., RK10)"
-                        value={promoInput}
-                        onChange={(e) => setPromoInput(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:outline-[#15803d]"
-                      />
+                      <div className="relative flex-1">
+                        <Ticket className="absolute left-3 top-[10px] w-4 h-4 text-emerald-600" />
+                        <input
+                          type="text"
+                          placeholder="Promo / Coupon Code (e.g. RK10)"
+                          value={promoInput}
+                          onChange={(e) => setPromoInput(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 pl-9 text-xs focus:outline-none focus:border-[#15803d]"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={handleApplyPromo}
-                        className="bg-[#15803d] hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2 rounded-lg"
+                        className="bg-[#15803d] hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2 rounded-lg transition duration-75 active:scale-95"
                       >
                         Apply
                       </button>
@@ -1668,7 +1770,7 @@ export default function App() {
                           </div>
                           {promoApplied && (
                             <div className="flex justify-between text-[#15803d] font-semibold">
-                              <span>Promo Discount (10%):</span>
+                              <span>Promo Discount ({promoDiscountPercent}%):</span>
                               <span>- {discount.toLocaleString()} AED</span>
                             </div>
                           )}
@@ -1951,7 +2053,7 @@ export default function App() {
                   <div className="bg-slate-50 p-4 rounded-xl flex items-center justify-between gap-3 text-xs border-r-4 border-slate-200">
                     <div>
                       <p className="font-bold text-slate-700">Need immediate help?</p>
-                      <p className="text-[10px] text-slate-400">Call us contextually on {STORE_CONTACT.phone}</p>
+                      <p className="text-[10px] text-slate-400">Call us contextually on {storeContact.phone}</p>
                     </div>
                     <button
                       onClick={() => setViewReceiptOrder(scannedOrder)}
@@ -2193,21 +2295,27 @@ export default function App() {
                 <aside className="hidden md:flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
                   <button
                     onClick={() => setDashboardView('stats')}
-                    className={`text-left p-3.5 text-xs font-bold font-sans flex items-center justify-between transition ${
+                    className={`text-left p-3.5 text-xs font-semibold font-sans flex items-center justify-between transition ${
                       dashboardView === 'stats' ? 'bg-[#15803d]/5 text-[#15803d] border-l-4 border-[#15803d]' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>Dashboard Stats</span>
+                    <div className="flex items-center gap-3">
+                      <LayoutGrid className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'stats' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                      <span>Dashboard Stats</span>
+                    </div>
                     <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
 
                   <button
                     onClick={() => setDashboardView('account')}
-                    className={`text-left p-3.5 text-xs font-bold font-sans flex items-center justify-between transition ${
+                    className={`text-left p-3.5 text-xs font-semibold font-sans flex items-center justify-between transition ${
                       dashboardView === 'account' ? 'bg-[#15803d]/5 text-[#15803d] border-l-4 border-[#15803d]' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>Account Details</span>
+                    <div className="flex items-center gap-3">
+                      <IdCard className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'account' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                      <span>Account Details</span>
+                    </div>
                     <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
 
@@ -2215,67 +2323,85 @@ export default function App() {
                     onClick={() => {
                       setCartDrawerOpen(true);
                     }}
-                    className="text-left p-3.5 text-xs font-bold font-sans flex items-center justify-between transition text-slate-600 hover:bg-slate-50"
+                    className="text-left p-3.5 text-xs font-semibold font-sans flex items-center justify-between transition text-slate-600 hover:bg-slate-50"
                   >
-                    <span>My Cart</span>
+                    <div className="flex items-center gap-3">
+                      <ShoppingCart className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>My Cart</span>
+                    </div>
                     <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
 
                   <button
                     onClick={() => setDashboardView('chat')}
-                    className={`text-left p-3.5 text-xs font-bold font-sans flex items-center justify-between transition ${
+                    className={`text-left p-3.5 text-xs font-semibold font-sans flex items-center justify-between transition ${
                       dashboardView === 'chat' ? 'bg-[#15803d]/5 text-[#15803d] border-l-4 border-[#15803d]' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>My Chat / WhatsApp</span>
+                    <div className="flex items-center gap-3">
+                      <MessageSquare className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'chat' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                      <span>My Chat / WhatsApp</span>
+                    </div>
                     <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
 
                   <button
                     onClick={() => setDashboardView('orders')}
-                    className={`text-left p-3.5 text-xs font-bold font-sans flex items-center justify-between transition ${
+                    className={`text-left p-3.5 text-xs font-semibold font-sans flex items-center justify-between transition ${
                       dashboardView === 'orders' || dashboardView === 'order_detail' ? 'bg-[#15803d]/5 text-[#15803d] border-l-4 border-[#15803d]' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>My Orders</span>
+                    <div className="flex items-center gap-3">
+                      <ClipboardList className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'orders' || dashboardView === 'order_detail' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                      <span>My Orders</span>
+                    </div>
                     <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
 
                   <button
                     onClick={() => setDashboardView('wishlist')}
-                    className={`text-left p-3.5 text-xs font-bold font-sans flex items-center justify-between transition ${
+                    className={`text-left p-3.5 text-xs font-semibold font-sans flex items-center justify-between transition ${
                       dashboardView === 'wishlist' ? 'bg-[#15803d]/5 text-[#15803d] border-l-4 border-[#15803d]' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>My Wishlist</span>
+                    <div className="flex items-center gap-3">
+                      <Heart className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'wishlist' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                      <span>My Wishlist</span>
+                    </div>
                     <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
 
                   <button
                     onClick={() => setDashboardView('addresses')}
-                    className={`text-left p-3.5 text-xs font-bold font-sans flex items-center justify-between transition ${
+                    className={`text-left p-3.5 text-xs font-semibold font-sans flex items-center justify-between transition ${
                       dashboardView === 'addresses' ? 'bg-[#15803d]/5 text-[#15803d] border-l-4 border-[#15803d]' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>Shipping Addresses</span>
+                    <div className="flex items-center gap-3">
+                      <MapPin className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'addresses' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                      <span>Shipping Addresses</span>
+                    </div>
                     <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
 
                   <button
                     onClick={() => setDashboardView('password_reset')}
-                    className={`text-left p-3.5 text-xs font-bold font-sans flex items-center justify-between transition ${
+                    className={`text-left p-3.5 text-xs font-semibold font-sans flex items-center justify-between transition ${
                       dashboardView === 'password_reset' ? 'bg-[#15803d]/5 text-[#15803d] border-l-4 border-[#15803d]' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>Password Reset</span>
+                    <div className="flex items-center gap-3">
+                      <Lock className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'password_reset' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                      <span>Password Reset</span>
+                    </div>
                     <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </button>
 
                   <button
                     onClick={handleLogout}
-                    className="text-left p-3.5 text-[11px] font-extrabold text-red-600 hover:bg-red-50 transition flex items-center gap-1"
+                    className="text-left p-3.5 text-[11px] font-extrabold text-red-650 hover:bg-red-50/50 transition flex items-center gap-3.5"
                   >
-                    <LogOut className="w-3.5 h-3.5" />
+                    <LogOut className="w-4 h-4 text-red-500 shrink-0" />
                     <span>Logout Account</span>
                   </button>
                 </aside>
@@ -2662,7 +2788,21 @@ export default function App() {
                                   )}
                                   <div>
                                     <p className="font-bold text-slate-800">{prod.name}</p>
-                                    <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()} AED</p>
+                                    {(() => {
+                                      const { currentPrice, oldPrice } = getProductPrices(prod);
+                                      return (
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[#c25927] font-semibold">
+                                            {currentPrice.toLocaleString()} AED
+                                          </span>
+                                          {oldPrice && (
+                                            <span className="text-slate-400 line-through text-[10px]/none font-normal">
+                                              {oldPrice.toLocaleString()} AED
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
 
@@ -2706,17 +2846,17 @@ export default function App() {
                       <div className="border border-slate-100 rounded-xl p-4 space-y-3">
                         <div className="flex justify-between">
                           <span className="text-slate-400 font-bold">Contact Number:</span>
-                          <span className="font-bold text-slate-800">{STORE_CONTACT.phone}</span>
+                          <span className="font-bold text-slate-800">{storeContact.phone}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400 font-bold">Hours of Operation:</span>
-                          <span className="text-slate-700 font-medium">{STORE_CONTACT.hours}</span>
+                          <span className="text-slate-700 font-medium">{storeContact.hours}</span>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <a
-                          href={STORE_CONTACT.whatsappUrl}
+                          href={storeContact.whatsappUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="bg-[#25D366] hover:bg-[#20ba59] text-white font-extrabold p-2.5 rounded-xl text-center flex items-center justify-center gap-1.5"
@@ -2729,7 +2869,7 @@ export default function App() {
                         </a>
 
                         <a
-                          href={`tel:${STORE_CONTACT.phone}`}
+                          href={`tel:${storeContact.phone}`}
                           className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold p-2.5 rounded-xl text-center flex items-center justify-center gap-1"
                         >
                           <Phone className="w-4 h-4" />
@@ -2937,7 +3077,21 @@ export default function App() {
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()} AED</p>
+                          {(() => {
+                            const { currentPrice, oldPrice } = getProductPrices(prod);
+                            return (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[#c25927] font-semibold">
+                                  {currentPrice.toLocaleString()} AED
+                                </span>
+                                {oldPrice && (
+                                  <span className="text-slate-400 line-through text-[10px]/none font-normal">
+                                    {oldPrice.toLocaleString()} AED
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Plus minus counter */}
                           <div className="flex items-center gap-2 pt-0.5">
@@ -2990,6 +3144,120 @@ export default function App() {
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* --- ADD TO CART SUCCESS POPUP (Floating visual card matching screenshot) --- */}
+      <AnimatePresence>
+        {addedProductPopup && (() => {
+          const prod = products.find((p) => p.id === addedProductPopup.productId);
+          if (!prod) return null;
+          const { currentPrice } = getProductPrices(prod);
+          const cartItem = cart.find((item) => item.productId === prod.id);
+          const itemQty = cartItem ? cartItem.quantity : addedProductPopup.qty;
+          const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              {/* Backdrop black layer */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setAddedProductPopup(null)}
+                className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+              />
+
+              {/* The Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 40 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 40 }}
+                className="relative w-full max-w-[360px] bg-white rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.15)] p-5 border border-slate-100 z-10 flex flex-col space-y-4 text-left font-sans text-slate-800"
+              >
+                {/* Header checkmark line */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-500 shrink-0">
+                      <div className="w-5.5 h-5.5 rounded-full border border-emerald-500 flex items-center justify-center">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                    </span>
+                    <span className="font-bold text-slate-800 text-[13px] sm:text-sm">
+                      Product added to cart successfully
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setAddedProductPopup(null)}
+                    className="w-7 h-7 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center transition focus:outline-none cursor-pointer"
+                    title="Close"
+                  >
+                    <X className="w-4 h-4 text-slate-450" />
+                  </button>
+                </div>
+
+                <hr className="border-slate-100 my-1" />
+
+                {/* Product details inside card */}
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 bg-slate-100 rounded-xl border border-slate-200/50 flex items-center justify-center overflow-hidden shrink-0">
+                    {prod.image === 'placeholder_box' ? (
+                      <BoxWithRays className="w-8 h-8 text-slate-400" />
+                    ) : (
+                      <img
+                        src={prod.image}
+                        alt={prod.name}
+                        className="w-full h-full object-cover rounded-xl"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+                  </div>
+                  <div className="text-left flex-1 space-y-0.5">
+                    <h4 className="font-bold text-slate-900 uppercase text-[11px] sm:text-xs tracking-tight leading-snug line-clamp-2">
+                      {prod.name}
+                    </h4>
+                    <p className="text-[10px] text-slate-450 font-bold">
+                      Quantity: {itemQty}
+                    </p>
+                    <p className="font-black text-[#15803d] text-xs sm:text-sm">
+                      {currentPrice.toLocaleString()} AED / {currentPrice.toLocaleString()} د.إ
+                    </p>
+                  </div>
+                </div>
+
+                {/* Vertical actions stack */}
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setAddedProductPopup(null);
+                      setCartDrawerOpen(true);
+                    }}
+                    className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-xs sm:text-sm py-2.5 rounded-lg transition text-center focus:outline-none cursor-pointer"
+                  >
+                    View Cart ({totalCartItems})
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setAddedProductPopup(null);
+                      setView('checkout');
+                    }}
+                    className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm py-2.5 rounded-lg transition shadow-sm text-center focus:outline-none cursor-pointer"
+                  >
+                    Buy Now
+                  </button>
+                </div>
+
+                {/* Continue button */}
+                <button
+                  onClick={() => setAddedProductPopup(null)}
+                  className="text-slate-500 font-semibold text-xs hover:text-slate-800 underline block text-center cursor-pointer bg-transparent border-0 outline-none mt-1"
+                >
+                  Continue Shopping
+                </button>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* --- FLOATING CATEGORIES SLIDE-OUT DRAWER SEGMENT (Matches user request screenshot) --- */}
@@ -3051,7 +3319,7 @@ export default function App() {
                         <img 
                           src={cat.image} 
                           alt={cat.name} 
-                          className="w-10 h-10 rounded-lg object-cover border border-slate-200/80 shadow-sm shrink-0"
+                          className="w-12 h-12 object-contain shrink-0"
                           referrerPolicy="no-referrer"
                         />
                       ) : (
@@ -3096,74 +3364,83 @@ export default function App() {
               <div className="flex-1 py-4 flex flex-col divide-y divide-slate-50 overflow-y-auto">
                 <button
                   onClick={() => { setDashboardView('stats'); setDashboardDrawerOpen(false); }}
-                  className={`text-left px-6 py-3 font-semibold text-xs text-slate-700 hover:bg-slate-50 transition ${
-                    dashboardView === 'stats' ? 'bg-[#15803d]/5 text-[#15803d]' : ''
+                  className={`flex items-center gap-3 px-6 py-3.5 text-xs font-semibold hover:bg-slate-50 transition text-left ${
+                    dashboardView === 'stats' ? 'bg-emerald-50/50 text-[#15803d]' : 'text-slate-700'
                   }`}
                 >
-                  Dashboard Stats
+                  <LayoutGrid className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'stats' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                  <span>Dashboard</span>
                 </button>
                 <button
                   onClick={() => { setDashboardView('account'); setDashboardDrawerOpen(false); }}
-                  className={`text-left px-6 py-3 font-semibold text-xs text-slate-700 hover:bg-slate-50 transition ${
-                    dashboardView === 'account' ? 'bg-[#15803d]/5 text-[#15803d]' : ''
+                  className={`flex items-center gap-3 px-6 py-3.5 text-xs font-semibold hover:bg-slate-50 transition text-left ${
+                    dashboardView === 'account' ? 'bg-emerald-50/50 text-[#15803d]' : 'text-slate-700'
                   }`}
                 >
-                  Account Details
+                  <IdCard className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'account' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                  <span>Account Details</span>
                 </button>
                 <button
                   onClick={() => { setCartDrawerOpen(true); setDashboardDrawerOpen(false); }}
-                  className="text-left px-6 py-3 font-semibold text-xs text-slate-700 hover:bg-slate-50 transition"
+                  className="flex items-center gap-3 px-6 py-3.5 text-xs font-semibold hover:bg-slate-50 text-slate-700 transition text-left"
                 >
-                  My Cart
+                  <ShoppingCart className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span>My Cart</span>
                 </button>
                 <button
                   onClick={() => { setDashboardView('chat'); setDashboardDrawerOpen(false); }}
-                  className={`text-left px-6 py-3 font-semibold text-xs text-slate-700 hover:bg-slate-50 transition ${
-                    dashboardView === 'chat' ? 'bg-[#15803d]/5 text-[#15803d]' : ''
+                  className={`flex items-center gap-3 px-6 py-3.5 text-xs font-semibold hover:bg-slate-50 transition text-left ${
+                    dashboardView === 'chat' ? 'bg-emerald-50/50 text-[#15803d]' : 'text-slate-700'
                   }`}
                 >
-                  My Chat / WhatsApp
+                  <MessageSquare className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'chat' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                  <span>My Chat</span>
                 </button>
                 <button
                   onClick={() => { setDashboardView('orders'); setDashboardDrawerOpen(false); }}
-                  className={`text-left px-6 py-3 font-semibold text-xs text-slate-700 hover:bg-slate-50 transition ${
-                    dashboardView === 'orders' || dashboardView === 'order_detail' ? 'bg-[#15803d]/5 text-[#15803d]' : ''
+                  className={`flex items-center gap-3 px-6 py-3.5 text-xs font-semibold hover:bg-slate-50 transition text-left ${
+                    dashboardView === 'orders' || dashboardView === 'order_detail' ? 'bg-emerald-50/50 text-[#15803d]' : 'text-slate-700'
                   }`}
                 >
-                  My Orders
+                  <ClipboardList className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'orders' || dashboardView === 'order_detail' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                  <span>My Orders</span>
                 </button>
                 <button
                   onClick={() => { setDashboardView('wishlist'); setDashboardDrawerOpen(false); }}
-                  className={`text-left px-6 py-3 font-semibold text-xs text-slate-700 hover:bg-slate-50 transition ${
-                    dashboardView === 'wishlist' ? 'bg-[#15803d]/5 text-[#15803d]' : ''
+                  className={`flex items-center gap-3 px-6 py-3.5 text-xs font-semibold hover:bg-slate-50 transition text-left ${
+                    dashboardView === 'wishlist' ? 'bg-emerald-50/50 text-[#15803d]' : 'text-slate-700'
                   }`}
                 >
-                  My Wishlist
+                  <Heart className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'wishlist' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                  <span>My Wishlist</span>
                 </button>
                 <button
                   onClick={() => { setDashboardView('addresses'); setDashboardDrawerOpen(false); }}
-                  className={`text-left px-6 py-3 font-semibold text-xs text-slate-700 hover:bg-slate-50 transition ${
-                    dashboardView === 'addresses' ? 'bg-[#15803d]/5 text-[#15803d]' : ''
+                  className={`flex items-center gap-3 px-6 py-3.5 text-xs font-semibold hover:bg-slate-50 transition text-left ${
+                    dashboardView === 'addresses' ? 'bg-emerald-50/50 text-[#15803d]' : 'text-slate-700'
                   }`}
                 >
-                  My Addresses
+                  <MapPin className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'addresses' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                  <span>My Addresses</span>
                 </button>
                 <button
                   onClick={() => { setDashboardView('password_reset'); setDashboardDrawerOpen(false); }}
-                  className={`text-left px-6 py-3 font-semibold text-xs text-slate-700 hover:bg-slate-50 transition ${
-                    dashboardView === 'password_reset' ? 'bg-[#15803d]/5 text-[#15803d]' : ''
+                  className={`flex items-center gap-3 px-6 py-3.5 text-xs font-semibold hover:bg-slate-50 transition text-left ${
+                    dashboardView === 'password_reset' ? 'bg-emerald-50/50 text-[#15803d]' : 'text-slate-700'
                   }`}
                 >
-                  Password Reset
+                  <Lock className={`w-4 h-4 shrink-0 transition-colors ${dashboardView === 'password_reset' ? 'text-[#15803d]' : 'text-slate-400'}`} />
+                  <span>Password Reset</span>
                 </button>
               </div>
 
               <div className="px-6 pt-4 border-t border-slate-100">
                 <button
                   onClick={() => { handleLogout(); setDashboardDrawerOpen(false); }}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs py-2 rounded-lg transition"
+                  className="w-full hover:bg-red-50 text-red-600 font-extrabold text-xs py-2.5 rounded-lg transition flex items-center justify-center gap-2 border border-red-200"
                 >
-                  Logout Account
+                  <LogOut className="w-4 h-4 text-red-500 shrink-0" />
+                  <span>Logout</span>
                 </button>
               </div>
             </motion.div>
@@ -3258,7 +3535,21 @@ export default function App() {
                               )}
                               <div className="text-left flex-1">
                                 <p className="font-bold text-slate-850">{prod.name}</p>
-                                <p className="text-[#c25927] font-semibold">{prod.price.toLocaleString()} AED</p>
+                                {(() => {
+                                  const { currentPrice, oldPrice } = getProductPrices(prod);
+                                  return (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[#c25927] font-semibold">
+                                        {currentPrice.toLocaleString()} AED
+                                      </span>
+                                      {oldPrice && (
+                                        <span className="text-slate-405 line-through text-[10px] font-normal">
+                                          {oldPrice.toLocaleString()} AED
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <ChevronRight className="w-4 h-4 text-slate-400" />
                             </div>
