@@ -89,33 +89,62 @@ const CabinetIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
 export default function App() {
   // --- Persistent State Manager (Local Storage) ---
   const [user, setUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('rk_user');
-    return saved ? JSON.parse(saved) : { name: '', phone: '', email: '', isLoggedIn: false };
+    try {
+      const saved = localStorage.getItem('rk_user');
+      return saved ? JSON.parse(saved) : { name: '', phone: '', email: '', isLoggedIn: false };
+    } catch (e) {
+      console.warn('Storage read failed:', e);
+      return { name: '', phone: '', email: '', isLoggedIn: false };
+    }
   });
 
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>(() => {
-    const saved = localStorage.getItem('rk_cart');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('rk_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn('Storage read failed:', e);
+      return [];
+    }
   });
 
   const [wishlist, setWishlist] = useState<string[]>(() => {
-    const saved = localStorage.getItem('rk_wishlist');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('rk_wishlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn('Storage read failed:', e);
+      return [];
+    }
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('rk_orders');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('rk_orders');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn('Storage read failed:', e);
+      return [];
+    }
   });
 
   const [addresses, setAddresses] = useState<ShippingAddress[]>(() => {
-    const saved = localStorage.getItem('rk_addresses');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('rk_addresses');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn('Storage read failed:', e);
+      return [];
+    }
   });
 
   const [registeredUsers, setRegisteredUsers] = useState<{ [phone: string]: { name: string; email: string; password?: string } }>(() => {
-    const saved = localStorage.getItem('rk_registered_users');
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('rk_registered_users');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Storage read failed:', e);
+    }
     return {};
   });
 
@@ -382,13 +411,17 @@ export default function App() {
   const [editPhone, setEditPhone] = useState('');
   const [editProfileMessage, setEditProfileMessage] = useState('');
 
-  // Save states back to local storage
+  // Save states back to local storage securely
   useEffect(() => {
-    localStorage.setItem('rk_user', JSON.stringify(user));
+    try {
+      localStorage.setItem('rk_user', JSON.stringify(user));
+    } catch (_) {}
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem('rk_registered_users', JSON.stringify(registeredUsers));
+    try {
+      localStorage.setItem('rk_registered_users', JSON.stringify(registeredUsers));
+    } catch (_) {}
   }, [registeredUsers]);
 
   useEffect(() => {
@@ -400,19 +433,27 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem('rk_cart', JSON.stringify(cart));
+    try {
+      localStorage.setItem('rk_cart', JSON.stringify(cart));
+    } catch (_) {}
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem('rk_wishlist', JSON.stringify(wishlist));
+    try {
+      localStorage.setItem('rk_wishlist', JSON.stringify(wishlist));
+    } catch (_) {}
   }, [wishlist]);
 
   useEffect(() => {
-    localStorage.setItem('rk_orders', JSON.stringify(orders));
+    try {
+      localStorage.setItem('rk_orders', JSON.stringify(orders));
+    } catch (_) {}
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem('rk_addresses', JSON.stringify(addresses));
+    try {
+      localStorage.setItem('rk_addresses', JSON.stringify(addresses));
+    } catch (_) {}
   }, [addresses]);
 
   // --- Active Navigation States ---
@@ -683,7 +724,10 @@ export default function App() {
     }
 
     // Guard/Check for master Admin Login
-    const adminPassword = localStorage.getItem('rk_admin_password') || 'rkfurniture0123';
+    let adminPassword = 'rkfurniture0123';
+    try {
+      adminPassword = localStorage.getItem('rk_admin_password') || 'rkfurniture0123';
+    } catch (_) {}
     if (loginPhone === '01700000000') {
       if (loginPassword === adminPassword) {
         // Fetch all registered users for Admin View

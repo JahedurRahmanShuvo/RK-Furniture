@@ -741,8 +741,10 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       return;
     }
 
-    // Save locally
-    localStorage.setItem('rk_admin_password', newPassword);
+    // Save locally securely
+    try {
+      localStorage.setItem('rk_admin_password', newPassword);
+    } catch (_) {}
 
     // Save on express server Users DB under 01700000000
     const updatedAdminObj = {
