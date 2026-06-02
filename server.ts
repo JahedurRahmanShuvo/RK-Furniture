@@ -139,39 +139,49 @@ async function loadCollectionFromFirestore<T>(collectionName: string, localFileP
   try {
     const colRef = collection(db, collectionName);
     const snapshot = await getDocs(colRef);
+    const localData = readJSONFile(localFilePath, defaultValue) as any[];
+    
     if (!snapshot.empty) {
-      const items: T[] = [];
+      const firestoreItems: any[] = [];
       snapshot.forEach((d) => {
         const item = d.data() as any;
         if (item && !item.id) {
           item.id = d.id;
         }
-        items.push(item as T);
+        firestoreItems.push(item);
       });
+      
+      // Bidirectional Safe Merge: Keep local items that are NOT in Firestore, and auto-seed them up to Firestore!
+      const mergedItems = [...firestoreItems];
+      for (const localItem of localData) {
+        const alreadyInFirestore = firestoreItems.some(
+          (f) => String(f.id) === String(localItem.id)
+        );
+        if (!alreadyInFirestore && localItem && localItem.id) {
+          mergedItems.push(localItem);
+          const docId = String(localItem.id || Math.random());
+          await setDoc(doc(db, collectionName, docId), localItem).catch((err) => {
+            console.error(`[Automerge Seed Error] for ${collectionName}/${docId}:`, err);
+          });
+        }
+      }
       
       // Ensure collections stay sorted
       if (collectionName === 'orders') {
-        (items as any[]).sort((a, b) => {
+        mergedItems.sort((a, b) => {
           const idA = String(a.id || '');
           const idB = String(b.id || '');
           return idB.localeCompare(idA);
         });
-      } else if (collectionName === 'products') {
-        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
-      } else if (collectionName === 'categories') {
-        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
-      } else if (collectionName === 'shipping_areas') {
-        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
-      } else if (collectionName === 'slides') {
-        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      } else {
+        mergedItems.sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
       }
 
       // Refresh local JSON cache
-      writeJSONFile(localFilePath, items);
-      return items;
+      writeJSONFile(localFilePath, mergedItems);
+      return mergedItems as T[];
     } else {
       // If Firestore is empty, seed from local JSON
-      const localData = readJSONFile(localFilePath, defaultValue);
       if (Array.isArray(localData) && localData.length > 0) {
         console.log(`[Firestore Seed] Seeding collection: ${collectionName} with ${localData.length} records`);
         for (const item of localData) {
@@ -179,7 +189,7 @@ async function loadCollectionFromFirestore<T>(collectionName: string, localFileP
           await setDoc(doc(db, collectionName, docId), item);
         }
       }
-      return localData;
+      return localData as T[];
     }
   } catch (error) {
     console.error(`[Firestore Sync Warning] Failed to fetch collection ${collectionName}:`, error);
@@ -212,15 +222,24 @@ async function loadUsersFromFirestore(): Promise<{ [key: string]: any }> {
   try {
     const colRef = collection(db, 'users');
     const snapshot = await getDocs(colRef);
+    const localUsers = readJSONFile(USERS_DB_PATH, {});
     const usersObj: { [key: string]: any } = {};
     if (!snapshot.empty) {
       snapshot.forEach((d) => {
         usersObj[d.id] = d.data();
       });
+      
+      // Merge local users who are not in Firestore
+      for (const phone in localUsers) {
+        if (!usersObj[phone]) {
+          usersObj[phone] = localUsers[phone];
+          await setDoc(doc(db, 'users', phone), localUsers[phone]).catch(() => {});
+        }
+      }
+      
       writeJSONFile(USERS_DB_PATH, usersObj);
       return usersObj;
     } else {
-      const localUsers = readJSONFile(USERS_DB_PATH, {});
       for (const phone in localUsers) {
         await setDoc(doc(db, 'users', phone), localUsers[phone]);
       }
