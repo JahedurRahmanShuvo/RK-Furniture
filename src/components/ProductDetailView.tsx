@@ -51,11 +51,6 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
         {/* Left: Gallery of Images */}
         <div className="space-y-3">
           <div className="bg-slate-50 rounded-xl h-56 sm:h-72 overflow-hidden flex items-center justify-center p-4 border border-slate-100 relative">
-            {hasDiscount && (
-              <span className="absolute bottom-3 left-3 bg-white text-slate-800 text-[10px] sm:text-xs font-extrabold px-3 py-1.5 rounded-lg shadow z-10 font-sans tracking-wider uppercase shrink-0">
-                SAVE {finalDiscountPercent}%
-              </span>
-            )}
             {selectedGalleryImg === 'placeholder_box' ? (
               <BoxWithRays className="w-32 h-32 text-slate-800" />
             ) : (

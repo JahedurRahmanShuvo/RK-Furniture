@@ -611,14 +611,7 @@ export default function App() {
       ? prod.price 
       : (prod.oldPrice || undefined);
     
-    let finalDiscountPercent = 0;
-    if (hasDiscount) {
-      finalDiscountPercent = prod.discountPercent || 0;
-    } else if (prod.oldPrice && prod.price && prod.price < prod.oldPrice) {
-      finalDiscountPercent = Math.round(((prod.oldPrice - prod.price) / prod.oldPrice) * 100);
-    }
-    
-    return { currentPrice, oldPrice, discountPercent: finalDiscountPercent };
+    return { currentPrice, oldPrice, discountPercent: prod.discountPercent || 0 };
   };
 
   // --- Helpers for Cart actions ---
