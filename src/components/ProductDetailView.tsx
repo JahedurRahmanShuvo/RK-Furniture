@@ -44,8 +44,8 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
         <div className="space-y-3">
           <div className="bg-slate-50 rounded-xl h-56 sm:h-72 overflow-hidden flex items-center justify-center p-4 border border-slate-100 relative">
             {hasDiscount && (
-              <span className="absolute top-3 left-3 bg-[#e11d48] text-white text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm uppercase shrink-0">
-                {prod.discountPercent}% OFF
+              <span className="absolute bottom-3 left-3 bg-white text-slate-800 text-[10px] sm:text-xs font-extrabold px-3 py-1.5 rounded-lg shadow z-10 font-sans tracking-wider uppercase shrink-0">
+                SAVE {prod.discountPercent}%
               </span>
             )}
             {selectedGalleryImg === 'placeholder_box' ? (

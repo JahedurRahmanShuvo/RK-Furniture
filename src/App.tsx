@@ -1198,6 +1198,11 @@ export default function App() {
                                   referrerPolicy="no-referrer"
                                 />
                               )}
+                              {prod.discountPercent && prod.discountPercent > 0 ? (
+                                <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
+                                  SAVE {prod.discountPercent}%
+                                </div>
+                              ) : null}
                             </div>
 
                             {/* Details and Actions block */}
@@ -1340,6 +1345,11 @@ export default function App() {
                                   referrerPolicy="no-referrer"
                                 />
                               )}
+                              {prod.discountPercent && prod.discountPercent > 0 ? (
+                                <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
+                                  SAVE {prod.discountPercent}%
+                                </div>
+                              ) : null}
                             </div>
 
                             {/* Info card details */}
@@ -1496,6 +1506,11 @@ export default function App() {
                               referrerPolicy="no-referrer"
                             />
                           )}
+                          {prod.discountPercent && prod.discountPercent > 0 ? (
+                            <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
+                              SAVE {prod.discountPercent}%
+                            </div>
+                          ) : null}
                         </div>
 
                         {/* Content details block */}
@@ -1637,6 +1652,11 @@ export default function App() {
                             referrerPolicy="no-referrer"
                           />
                         )}
+                        {prod.discountPercent && prod.discountPercent > 0 ? (
+                          <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
+                            SAVE {prod.discountPercent}%
+                          </div>
+                        ) : null}
                       </div>
 
                       {/* Info & Details */}
