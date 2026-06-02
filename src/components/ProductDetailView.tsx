@@ -20,13 +20,21 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
     setDetailQty(1);
   }, [prod.id, prod.image]);
 
-  const hasDiscount = !!prod.discountPercent && prod.discountPercent > 0;
-  const currentPrice = hasDiscount 
+  const explicitDiscount = !!prod.discountPercent && prod.discountPercent > 0;
+  const currentPrice = explicitDiscount 
     ? Math.round(prod.price * (1 - prod.discountPercent / 100))
     : prod.price;
-  const oldPrice = hasDiscount 
+  const oldPrice = explicitDiscount 
     ? prod.price 
     : (prod.oldPrice || undefined);
+
+  let finalDiscountPercent = 0;
+  if (explicitDiscount) {
+    finalDiscountPercent = prod.discountPercent || 0;
+  } else if (prod.oldPrice && prod.price && prod.price < prod.oldPrice) {
+    finalDiscountPercent = Math.round(((prod.oldPrice - prod.price) / prod.oldPrice) * 100);
+  }
+  const hasDiscount = finalDiscountPercent > 0;
 
   return (
     <div className="space-y-5">
@@ -45,7 +53,7 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
           <div className="bg-slate-50 rounded-xl h-56 sm:h-72 overflow-hidden flex items-center justify-center p-4 border border-slate-100 relative">
             {hasDiscount && (
               <span className="absolute bottom-3 left-3 bg-white text-slate-800 text-[10px] sm:text-xs font-extrabold px-3 py-1.5 rounded-lg shadow z-10 font-sans tracking-wider uppercase shrink-0">
-                SAVE {prod.discountPercent}%
+                SAVE {finalDiscountPercent}%
               </span>
             )}
             {selectedGalleryImg === 'placeholder_box' ? (

@@ -610,7 +610,15 @@ export default function App() {
     const oldPrice = hasDiscount 
       ? prod.price 
       : (prod.oldPrice || undefined);
-    return { currentPrice, oldPrice, discountPercent: prod.discountPercent };
+    
+    let finalDiscountPercent = 0;
+    if (hasDiscount) {
+      finalDiscountPercent = prod.discountPercent || 0;
+    } else if (prod.oldPrice && prod.price && prod.price < prod.oldPrice) {
+      finalDiscountPercent = Math.round(((prod.oldPrice - prod.price) / prod.oldPrice) * 100);
+    }
+    
+    return { currentPrice, oldPrice, discountPercent: finalDiscountPercent };
   };
 
   // --- Helpers for Cart actions ---
@@ -1171,6 +1179,7 @@ export default function App() {
                       .filter((p) => p.category === selectedCategory)
                       .map((prod) => {
                         const inWish = wishlist.includes(prod.id);
+                        const { discountPercent } = getProductPrices(prod);
                         return (
                           <motion.div
                             key={prod.id}
@@ -1198,9 +1207,9 @@ export default function App() {
                                   referrerPolicy="no-referrer"
                                 />
                               )}
-                              {prod.discountPercent && prod.discountPercent > 0 ? (
+                              {discountPercent && discountPercent > 0 ? (
                                 <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
-                                  SAVE {prod.discountPercent}%
+                                  SAVE {discountPercent}%
                                 </div>
                               ) : null}
                             </div>
@@ -1317,6 +1326,7 @@ export default function App() {
                     <div className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x no-scrollbar select-none">
                       {trendingProds.map((prod) => {
                         const inWish = wishlist.includes(prod.id);
+                        const { discountPercent } = getProductPrices(prod);
                         return (
                           <motion.div
                             key={`trending-${prod.id}`}
@@ -1345,9 +1355,9 @@ export default function App() {
                                   referrerPolicy="no-referrer"
                                 />
                               )}
-                              {prod.discountPercent && prod.discountPercent > 0 ? (
+                              {discountPercent && discountPercent > 0 ? (
                                 <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
-                                  SAVE {prod.discountPercent}%
+                                  SAVE {discountPercent}%
                                 </div>
                               ) : null}
                             </div>
@@ -1471,6 +1481,7 @@ export default function App() {
                     .filter((p) => !selectedCategory || p.category === selectedCategory)
                     .map((prod) => {
                     const inWish = wishlist.includes(prod.id);
+                    const { discountPercent } = getProductPrices(prod);
                     return (
                       <motion.div
                         key={prod.id}
@@ -1506,9 +1517,9 @@ export default function App() {
                               referrerPolicy="no-referrer"
                             />
                           )}
-                          {prod.discountPercent && prod.discountPercent > 0 ? (
+                          {discountPercent && discountPercent > 0 ? (
                             <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
-                              SAVE {prod.discountPercent}%
+                              SAVE {discountPercent}%
                             </div>
                           ) : null}
                         </div>
@@ -1624,6 +1635,7 @@ export default function App() {
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 {products.filter(p => p.isTrending).map((prod) => {
                   const inWish = wishlist.includes(prod.id);
+                  const { discountPercent } = getProductPrices(prod);
                   return (
                     <motion.div
                       key={`grid-trending-${prod.id}`}
@@ -1652,9 +1664,9 @@ export default function App() {
                             referrerPolicy="no-referrer"
                           />
                         )}
-                        {prod.discountPercent && prod.discountPercent > 0 ? (
+                        {discountPercent && discountPercent > 0 ? (
                           <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
-                            SAVE {prod.discountPercent}%
+                            SAVE {discountPercent}%
                           </div>
                         ) : null}
                       </div>
