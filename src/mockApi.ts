@@ -71,12 +71,6 @@ const DEFAULT_SLIDES = [
     title: 'Sustainable Wooden Designs',
     subtitle: 'Experience classic artistry combined with durable modern aesthetics.',
     bg: 'https://images.unsplash.com/photo-1484101403633-562f891dc89a?auto=format&fit=crop&w=1200&q=80'
-  },
-  {
-    id: 'slide_3',
-    title: 'Cozy Royal Sofa Set',
-    subtitle: 'Designed for ultimate relaxation and supreme spinal comfort.',
-    bg: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80'
   }
 ];
 
@@ -512,6 +506,35 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
       };
       await saveFirestoreDoc('store_contact', 'contact_info', updatedContact);
       responseData = updatedContact;
+    }
+  }
+
+  // 3d-2. SHOP POLICIES
+  else if (resource === 'shop-policies') {
+    const defaultPolicies = [{
+      id: 'policies',
+      aboutUs: 'RK Furniture is a premium furniture provider based in Dubai, UAE, offering high-quality design elements.',
+      privacyPolicy: 'We respect your privacy. All customer data remains strictly confidential and secure.',
+      termsConditions: 'Standard service terms apply. Delivery details and times are calculated custom for each zone.',
+      refundPolicy: 'Refunds are managed based on specific defect reviews within 7 days of package delivery.',
+      cancelationPolicy: 'Orders may be cancelled within 12 hours. Returns may attract standard logistics costs.'
+    }];
+    const currentPolicies = await getFirestoreCollection('shop_policies', defaultPolicies);
+
+    if (method === 'GET') {
+      responseData = currentPolicies[0] || defaultPolicies[0];
+    } else if (method === 'POST') {
+      const payload = JSON.parse(init?.body as string);
+      const updatedPolicies = {
+        id: 'policies',
+        aboutUs: payload.aboutUs || '',
+        privacyPolicy: payload.privacyPolicy || '',
+        termsConditions: payload.termsConditions || '',
+        refundPolicy: payload.refundPolicy || '',
+        cancelationPolicy: payload.cancelationPolicy || ''
+      };
+      await saveFirestoreDoc('shop_policies', 'policies', updatedPolicies);
+      responseData = updatedPolicies;
     }
   }
 

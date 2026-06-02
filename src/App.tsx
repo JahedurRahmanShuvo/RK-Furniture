@@ -134,7 +134,22 @@ export default function App() {
     hours: 'Available 24/7 for support'
   });
 
+  const [shopPolicies, setShopPolicies] = useState<{
+    aboutUs: string;
+    privacyPolicy: string;
+    termsConditions: string;
+    refundPolicy: string;
+    cancelationPolicy: string;
+  }>({
+    aboutUs: 'RK Furniture is a premium furniture provider based in Dubai, UAE, offering high-quality design elements.',
+    privacyPolicy: 'We respect your privacy. All customer data remains strictly confidential and secure.',
+    termsConditions: 'Standard service terms apply. Delivery details and times are calculated custom for each zone.',
+    refundPolicy: 'Refunds are managed based on specific defect reviews within 7 days of package delivery.',
+    cancelationPolicy: 'Orders may be cancelled within 12 hours. Returns may attract standard logistics costs.'
+  });
+
   const [appLoading, setAppLoading] = useState(true);
+  const [activeFooterPolicy, setActiveFooterPolicy] = useState<string | null>(null);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [promoDiscountPercent, setPromoDiscountPercent] = useState<number>(0);
 
@@ -216,6 +231,21 @@ export default function App() {
         }
       })
       .catch((err) => console.error('Failed to sync coupons from server:', err));
+
+    fetch('/api/shop-policies')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data) {
+          setShopPolicies({
+            aboutUs: data.aboutUs || '',
+            privacyPolicy: data.privacyPolicy || '',
+            termsConditions: data.termsConditions || '',
+            refundPolicy: data.refundPolicy || '',
+            cancelationPolicy: data.cancelationPolicy || '',
+          });
+        }
+      })
+      .catch((err) => console.error('Failed to sync shop policies from server:', err));
   };
 
   useEffect(() => {
@@ -486,49 +516,66 @@ export default function App() {
   const [newAddressEmail, setNewAddressEmail] = useState('');
   const [newAddressDetails, setNewAddressDetails] = useState('');
 
-  // Hero image slider index state
-  const [activeSlide, setActiveSlide] = useState(0);
+  // Hero image slider index states
+  const [activeTopSlide, setActiveTopSlide] = useState(0);
+  const [activeMiddleSlide, setActiveMiddleSlide] = useState(0);
   const [slides, setSlides] = useState<any[]>([
     {
       id: 'slide_1',
       title: 'Premium Handcrafted Furniture',
       subtitle: 'Elevate your living space with our luxurious, comfy collections.',
       bg: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=1200&q=80',
+      position: 'top'
     },
     {
       id: 'slide_2',
       title: 'Sustainable Wooden Designs',
       subtitle: 'Experience classic artistry combined with durable modern aesthetics.',
       bg: 'https://images.unsplash.com/photo-1484101403633-562f891dc89a?auto=format&fit=crop&w=1200&q=80',
+      position: 'top'
     },
     {
       id: 'slide_3',
       title: 'Cozy Royal Sofa Set',
       subtitle: 'Designed for ultimate relaxation and supreme spinal comfort.',
       bg: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80',
+      position: 'top'
     },
     {
       id: 'slide_4',
       title: 'Luxury Bedroom Collections',
       subtitle: 'Wooden bed frames crafted to give you a royal sleeping experience.',
       bg: 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80',
+      position: 'middle'
     },
     {
       id: 'slide_5',
       title: 'Premium Dining Delights',
       subtitle: 'Gather with your family on polished mahogany wood tables.',
       bg: 'https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=1200&q=80',
+      position: 'middle'
     }
   ]);
 
-  // Autoplay slideshow
+  const topSlides = slides.filter(s => s.position === 'top' || !s.position);
+  const middleSlides = slides.filter(s => s.position === 'middle');
+
+  // Autoplay slideshows
   useEffect(() => {
-    if (slides.length <= 1) return;
+    if (topSlides.length <= 1) return;
     const interval = setInterval(() => {
-      setActiveSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
+      setActiveTopSlide((prev) => (prev === topSlides.length - 1 ? 0 : prev + 1));
     }, 5000);
     return () => clearInterval(interval);
-  }, [slides.length]);
+  }, [topSlides.length]);
+
+  useEffect(() => {
+    if (middleSlides.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveMiddleSlide((prev) => (prev === middleSlides.length - 1 ? 0 : prev + 1));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [middleSlides.length]);
 
   // Sync state between Tab clicks and view panel
   const handleTabChange = (tab: 'home' | 'categories' | 'cart' | 'profile') => {
@@ -1226,22 +1273,21 @@ export default function App() {
                 </motion.div>
               ) : (
                 <>
-                  {/* Promo Banner / Carousel */}
+                  {/* Top Promo Banner / Carousel */}
                   {(() => {
-                    const currentSlide = slides[activeSlide] || slides[0];
+                    const currentSlide = topSlides[activeTopSlide] || topSlides[0];
                     if (!currentSlide) return null;
                     return (
-                      <div className="relative rounded-2xl overflow-hidden h-44 sm:h-56 shadow-md border border-slate-100 flex items-center bg-slate-50">
+                      <div className="relative rounded-2xl overflow-hidden shadow-md border border-slate-100 flex items-center bg-slate-105 w-full h-auto mb-6">
                         <img
                           src={currentSlide.bg}
-                          alt="Banner"
-                          className="absolute inset-0 w-full h-full object-cover"
+                          alt="Top Banner"
+                          className="w-full h-auto block rounded-2xl"
                           referrerPolicy="no-referrer"
                         />
                       </div>
                     );
                   })()}
-
 
               {/* --- 1. TRENDING PRODUCTS --- */}
               {(() => {
@@ -1363,6 +1409,22 @@ export default function App() {
                         );
                       })}
                     </div>
+                  </div>
+                );
+              })()}
+
+              {/* Middle Banner slider (Allows exactly 2 banners for beautiful aesthetic alignment) */}
+              {(() => {
+                const currentSlide = middleSlides[activeMiddleSlide] || middleSlides[0];
+                if (!currentSlide) return null;
+                return (
+                  <div className="relative rounded-2xl overflow-hidden shadow-md border border-slate-100 flex items-center bg-slate-105 w-full h-auto">
+                    <img
+                      src={currentSlide.bg}
+                      alt="Middle Banner"
+                      className="w-full h-auto block rounded-2xl"
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
                 );
               })()}
@@ -3161,9 +3223,93 @@ export default function App() {
       </div>
 
       {/* --- Footer Signature Segment (Anti-slop clean background) --- */}
-      <footer className="max-w-4xl mx-auto w-full px-4 border-t border-slate-100 py-6 text-center text-xs text-slate-400 bg-[#fcfaf7]">
-        <p className="font-sans">© 2026 RK Furniture. Powered by Jahedur Rahman Shuvo.</p>
+      <footer className="max-w-4xl mx-auto w-full px-4 border-t border-slate-100 py-8 text-center text-xs text-slate-400 bg-[#fcfaf7]">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] font-bold text-slate-500">
+            <button 
+              onClick={() => setActiveFooterPolicy('aboutUs')}
+              className="hover:text-amber-700 transition cursor-pointer hover:underline"
+            >
+              About Us
+            </button>
+            <span className="text-slate-200">|</span>
+            <button 
+              onClick={() => setActiveFooterPolicy('privacyPolicy')}
+              className="hover:text-amber-700 transition cursor-pointer hover:underline"
+            >
+              Privacy Policy
+            </button>
+            <span className="text-slate-200">|</span>
+            <button 
+              onClick={() => setActiveFooterPolicy('termsConditions')}
+              className="hover:text-amber-700 transition cursor-pointer hover:underline"
+            >
+              Terms of Conditions
+            </button>
+            <span className="text-slate-200">|</span>
+            <button 
+              onClick={() => setActiveFooterPolicy('refundPolicy')}
+              className="hover:text-amber-700 transition cursor-pointer hover:underline"
+            >
+              Refund Policy
+            </button>
+            <span className="text-slate-200">|</span>
+            <button 
+              onClick={() => setActiveFooterPolicy('cancelationPolicy')}
+              className="hover:text-amber-700 transition cursor-pointer hover:underline"
+            >
+              Cancelation Policy
+            </button>
+          </div>
+          <div className="space-y-0.5">
+            <p className="font-sans font-semibold">© 2026 RK Furniture. All rights reserved.</p>
+            <p className="font-sans text-[10px] text-slate-350">Powered by Jahedur Rahman Shuvo.</p>
+          </div>
+        </div>
       </footer>
+
+      {/* --- DYNAMIC SHOP POLICY MODAL OVERLAY --- */}
+      {activeFooterPolicy && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative shadow-2xl border border-slate-100 text-left">
+            <button 
+              onClick={() => setActiveFooterPolicy(null)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition cursor-pointer focus:outline-none"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 uppercase tracking-wide flex items-center">
+                <span>
+                  {activeFooterPolicy === 'aboutUs' && 'About Us'}
+                  {activeFooterPolicy === 'privacyPolicy' && 'Privacy Policy'}
+                  {activeFooterPolicy === 'termsConditions' && 'Terms of Conditions'}
+                  {activeFooterPolicy === 'refundPolicy' && 'Refund Policy'}
+                  {activeFooterPolicy === 'cancelationPolicy' && 'Cancelation Policy'}
+                </span>
+              </h3>
+              
+              <div className="text-sm text-slate-600 leading-relaxed max-h-96 overflow-y-auto whitespace-pre-wrap font-sans font-medium pr-1">
+                {activeFooterPolicy === 'aboutUs' && shopPolicies.aboutUs}
+                {activeFooterPolicy === 'privacyPolicy' && shopPolicies.privacyPolicy}
+                {activeFooterPolicy === 'termsConditions' && shopPolicies.termsConditions}
+                {activeFooterPolicy === 'refundPolicy' && shopPolicies.refundPolicy}
+                {activeFooterPolicy === 'cancelationPolicy' && shopPolicies.cancelationPolicy}
+              </div>
+              
+              <div className="pt-2 flex justify-end">
+                <button 
+                  onClick={() => setActiveFooterPolicy(null)}
+                  className="bg-[#157F3D] hover:bg-[#116631] text-white px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer focus:outline-none shadow-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- FLOATING PORTABLE CART SLIDE-OUT DRAWER SEGMENT (Representation of Image 26) --- */}
       <AnimatePresence>

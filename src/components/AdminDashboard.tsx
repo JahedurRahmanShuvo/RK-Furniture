@@ -3,7 +3,7 @@ import {
   Trash2, Plus, Search, LogOut, RefreshCw, 
   ShoppingBag, TrendingUp, Box, Edit, Users, 
   CheckCircle2, Clock, Truck, Laptop, Phone, 
-  MapPin, Lock, X, Check, Eye, Tags, MessageCircle, Ticket, ClipboardList
+  MapPin, Lock, X, Check, Eye, Tags, MessageCircle, Ticket, ClipboardList, FileText
 } from 'lucide-react';
 import { Product, Order, OrderStatus } from '../types';
 import OrderReceipt from './OrderReceipt';
@@ -121,6 +121,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [slideTitle, setSlideTitle] = useState('');
   const [slideSubtitle, setSlideSubtitle] = useState('');
   const [slideBg, setSlideBg] = useState('');
+  const [slidePosition, setSlidePosition] = useState<'top' | 'middle'>('top');
 
   // Categories dynamic state
   const [localCategories, setLocalCategories] = useState<any[]>([]);
@@ -140,6 +141,21 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     phone: '01715838191',
     whatsappUrl: 'https://wa.me/8801715838191',
     hours: 'Available 24/7 for support'
+  });
+
+  // Shop Policies state
+  const [shopPolicies, setShopPolicies] = useState<{
+    aboutUs: string;
+    privacyPolicy: string;
+    termsConditions: string;
+    refundPolicy: string;
+    cancelationPolicy: string;
+  }>({
+    aboutUs: '',
+    privacyPolicy: '',
+    termsConditions: '',
+    refundPolicy: '',
+    cancelationPolicy: ''
   });
 
   // Load backend statistics
@@ -224,6 +240,22 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         }
       })
       .catch((err) => console.error('Admin API error loading coupons list:', err));
+
+    // 9. Fetch Shop Policies
+    fetch('/api/shop-policies')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data) {
+          setShopPolicies({
+            aboutUs: data.aboutUs || '',
+            privacyPolicy: data.privacyPolicy || '',
+            termsConditions: data.termsConditions || '',
+            refundPolicy: data.refundPolicy || '',
+            cancelationPolicy: data.cancelationPolicy || '',
+          });
+        }
+      })
+      .catch((err) => console.error('Admin API error loading shop policies:', err));
   };
 
   useEffect(() => {
@@ -256,6 +288,17 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
           }),
           fetch('/api/coupons').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setCouponsList(data);
+          }),
+          fetch('/api/shop-policies').then((res) => res.json()).then((data) => {
+            if (data) {
+              setShopPolicies({
+                aboutUs: data.aboutUs || '',
+                privacyPolicy: data.privacyPolicy || '',
+                termsConditions: data.termsConditions || '',
+                refundPolicy: data.refundPolicy || '',
+                cancelationPolicy: data.cancelationPolicy || '',
+              });
+            }
           })
         ]);
         // Fast artificial timeout to guarantee super smooth transition
@@ -445,6 +488,13 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   // --- Slides Management Handlers ---
   const handleAddNewSlideSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (slidePosition === 'middle') {
+      const middleCount = localSlides.filter(s => s.position === 'middle').length;
+      if (middleCount >= 2) {
+        showToast('For elegant layout aesthetics, you can add a maximum of 2 slides in the middle slider!', 'error');
+        return;
+      }
+    }
     if (!slideBg) {
       showToast('Please upload a slide banner cover image first!', 'error');
       return;
@@ -453,7 +503,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       id: 'slide_' + Date.now(),
       title: slideTitle,
       subtitle: slideSubtitle,
-      bg: slideBg
+      bg: slideBg,
+      position: slidePosition
     };
     const updated = [...localSlides, newSlide];
     saveSlidesList(updated, 'New slide banner added successfully!');
@@ -462,9 +513,16 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const handleUpdateSlideSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSlide) return;
+    if (slidePosition === 'middle') {
+      const otherMiddleCount = localSlides.filter(s => s.id !== editingSlide.id && s.position === 'middle').length;
+      if (otherMiddleCount >= 2) {
+        showToast('For elegant layout aesthetics, you can add a maximum of 2 slides in the middle slider!', 'error');
+        return;
+      }
+    }
     const updated = localSlides.map((s) => 
       s.id === editingSlide.id 
-        ? { ...s, title: slideTitle, subtitle: slideSubtitle, bg: slideBg || s.bg }
+        ? { ...s, title: slideTitle, subtitle: slideSubtitle, bg: slideBg || s.bg, position: slidePosition }
         : s
     );
     saveSlidesList(updated, 'Slide banner details updated successfully!');
@@ -1374,6 +1432,22 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Coupons List</span>
               <span className="text-[8px] sm:text-[9px] text-violet-700 font-bold block mt-0.5 font-mono">Total {couponsList.length}</span>
             </button>
+
+            {/* 8. Shop Policy - Double Ordinary Size (col-span-2) */}
+            <button 
+              onClick={() => {
+                setActiveTab('shop_policies');
+                showToast('Opened shop policies editor.', 'info');
+              }}
+              className="bg-[#fff1f2] border border-rose-100 hover:bg-rose-50/80 p-4 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 active:scale-95 group focus:outline-none cursor-pointer h-28 col-span-2"
+            >
+              <div className="relative flex items-center justify-center w-12 h-12 rounded-full border border-dashed border-rose-450 bg-rose-100 shadow-sm mb-2 shrink-0 group-hover:scale-110 transition-transform">
+                <div className="absolute inset-0.5 rounded-full border border-rose-300/60" />
+                <FileText className="w-5 h-5 text-rose-600 z-10" />
+              </div>
+              <span className="text-[11px] sm:text-[12px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Shop Policy</span>
+              <span className="text-[9px] text-rose-700 font-bold block mt-0.5 font-mono">Manage Company Rules & Info</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1784,6 +1858,10 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-200 gap-3">
                 <div className="text-left">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase">Sliders Management</h3>
+                  <p className="text-[10px] text-[#c25927] font-semibold mt-1">
+                    For website aesthetics, slider banners will be displayed at the Top (unlimited) and Middle layout positions. A maximum of 2 slides can be added for the Middle position.
+                  </p>
                 </div>
                 
                 <button
@@ -1793,8 +1871,9 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     setSlideTitle('');
                     setSlideSubtitle('');
                     setSlideBg('');
+                    setSlidePosition('top');
                   }}
-                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs py-2 px-3.5 rounded-lg flex items-center gap-1.5 focus:outline-none cursor-pointer"
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-sm font-bold text-xs py-2 px-3.5 rounded-lg flex items-center gap-1.5 focus:outline-none cursor-pointer transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add New Slider</span>
@@ -1824,10 +1903,22 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
                   <form onSubmit={isAddingSlide ? handleAddNewSlideSubmit : handleUpdateSlideSubmit} className="space-y-4 text-xs">
                     <div className="space-y-1 bg-white p-3 rounded-lg border border-slate-200">
+                      <label className="font-bold text-slate-500 block mb-1.5">Slider Position (Select Position) *</label>
+                      <select
+                        value={slidePosition}
+                        onChange={(e) => setSlidePosition(e.target.value as 'top' | 'middle')}
+                        className="w-full bg-white border border-slate-200 text-slate-800 text-xs py-2.5 px-3 rounded-lg font-medium focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="top">Top Slide Banner (Top position - Unlimited)</option>
+                        <option value="middle">Middle Slide Banner (Middle position - Max 2 slides)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1 bg-white p-3 rounded-lg border border-slate-200">
                       <label className="font-bold text-slate-500 block mb-1.5">Upload Slide Banner Image * (Select image file from your device gallery)</label>
                       
                       <div className="bg-amber-50 border border-amber-200/60 rounded-lg p-2.5 mb-3 text-[10.5px] text-amber-850 leading-relaxed font-sans font-medium">
-                        ★ <span className="font-bold">Recommended Slider Size:</span> 1200 x 500 pixels (or a similar landscape aspect ratio) for best display clarity on both mobile and desktop screens.
+                        ★ <span className="font-bold">Recommended Slider Size:</span> 1200 x 560 pixels (or a similar landscape aspect ratio) for best display clarity on both mobile and desktop screens.
                       </div>
                       <div className="flex items-center gap-3">
                         <input
@@ -1893,6 +1984,13 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                         <span className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 text-[9px] font-mono text-amber-600 rounded border border-amber-200">
                           Slide #{index + 1}
                         </span>
+                        <span className={`absolute top-2 right-2 px-2 py-0.5 text-[8.5px] font-bold rounded uppercase ${
+                          slide.position === 'middle' 
+                            ? 'bg-amber-650 text-white shadow-sm' 
+                            : 'bg-emerald-600 text-white shadow-sm'
+                        }`}>
+                          {slide.position === 'middle' ? 'Middle' : 'Top'}
+                        </span>
                       </div>
                       <div className="p-3 text-left flex-1 flex flex-col justify-between">
                         <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2.5">
@@ -1903,6 +2001,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                               setSlideTitle(slide.title);
                               setSlideSubtitle(slide.subtitle);
                               setSlideBg(slide.bg);
+                              setSlidePosition(slide.position || 'top');
                             }}
                             className="bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[10px] font-bold py-1.5 rounded flex items-center justify-center gap-1 focus:outline-none cursor-pointer transition-colors"
                           >
@@ -2360,15 +2459,19 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-650 uppercase">Discount Percent (%)</label>
-                      <select 
+                      <input 
+                        type="number"
+                        min="1"
+                        max="100"
+                        required
                         value={couponPercent}
-                        onChange={(e) => setCouponPercent(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setCouponPercent(Math.min(100, Math.max(1, val || 1)));
+                        }}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-bold focus:outline-none focus:border-violet-500 shadow-sm"
-                      >
-                        {[5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70].map(val => (
-                          <option key={val} value={val}>{val}% Discount</option>
-                        ))}
-                      </select>
+                        placeholder="e.g. 15"
+                      />
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -2423,6 +2526,116 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                       No coupon code defined. Click "Add Coupon" to configure code.
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 10. SHOP POLICIES SETTINGS TAB */}
+          {activeTab === 'shop_policies' && (
+            <div className="space-y-6 text-left">
+              <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl flex items-center gap-3">
+                <FileText className="w-8 h-8 text-rose-600 shrink-0" />
+                <div>
+                  <h4 className="text-sm font-bold text-rose-800 uppercase">Shop Policy & Documents Settings</h4>
+                  <p className="text-[10px] text-rose-600 font-semibold leading-relaxed">
+                    Update store policies (About Us, Privacy Policy, Terms & Conditions, Refund Policy, Cancelation Policy) which appear dynamically in the homepage footer.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-150 rounded-2xl p-5 space-y-4 shadow-sm">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block uppercase">About Us</label>
+                  <p className="text-[10px] text-slate-400 mb-1">Company history, mission, craftsmanship, and materials description.</p>
+                  <textarea 
+                    value={shopPolicies.aboutUs}
+                    onChange={(e) => setShopPolicies(prev => ({ ...prev, aboutUs: e.target.value }))}
+                    rows={4}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-semibold leading-relaxed"
+                    placeholder="We represent..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 block uppercase">Privacy Policy</label>
+                    <textarea 
+                      value={shopPolicies.privacyPolicy}
+                      onChange={(e) => setShopPolicies(prev => ({ ...prev, privacyPolicy: e.target.value }))}
+                      rows={5}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-semibold leading-relaxed"
+                      placeholder="We respect private data..."
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 block uppercase">Terms of Conditions</label>
+                    <textarea 
+                      value={shopPolicies.termsConditions}
+                      onChange={(e) => setShopPolicies(prev => ({ ...prev, termsConditions: e.target.value }))}
+                      rows={5}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-semibold leading-relaxed"
+                      placeholder="Standard terms apply..."
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 block uppercase">Refund Policy</label>
+                    <textarea 
+                      value={shopPolicies.refundPolicy}
+                      onChange={(e) => setShopPolicies(prev => ({ ...prev, refundPolicy: e.target.value }))}
+                      rows={5}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-semibold leading-relaxed"
+                      placeholder="Refunds are accepted..."
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 block uppercase">Cancelation Policy</label>
+                    <textarea 
+                      value={shopPolicies.cancelationPolicy}
+                      onChange={(e) => setShopPolicies(prev => ({ ...prev, cancelationPolicy: e.target.value }))}
+                      rows={5}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-semibold leading-relaxed"
+                      placeholder="Cancelation are managed within..."
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      fetch('/api/shop-policies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(shopPolicies)
+                      })
+                        .then((res) => res.json())
+                        .then((data) => {
+                          if (data) {
+                            setShopPolicies({
+                              aboutUs: data.aboutUs || '',
+                              privacyPolicy: data.privacyPolicy || '',
+                              termsConditions: data.termsConditions || '',
+                              refundPolicy: data.refundPolicy || '',
+                              cancelationPolicy: data.cancelationPolicy || '',
+                            });
+                            showToast('Shop policies successfully updated and synchronized!', 'success');
+                          }
+                        })
+                        .catch((err) => {
+                          console.error('Failed to save shop policies:', err);
+                          showToast('Failed to save policies to server.', 'error');
+                        });
+                    }}
+                    className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-bold text-xs py-3.5 px-4 rounded-xl shadow-sm transition-all focus:outline-none cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>SAVE SHOP POLICIES SETTINGS</span>
+                  </button>
                 </div>
               </div>
             </div>

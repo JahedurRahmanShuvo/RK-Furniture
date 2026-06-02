@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Order } from '../types';
@@ -13,6 +13,21 @@ interface OrderReceiptProps {
 export default function OrderReceipt({ order, onClose }: OrderReceiptProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [storeContact, setStoreContact] = useState<{ phone: string; hours: string }>({
+    phone: '01715838191',
+    hours: 'Available 24/7 for support'
+  });
+
+  useEffect(() => {
+    fetch('/api/store-contact')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.phone) {
+          setStoreContact(data);
+        }
+      })
+      .catch((err) => console.error('Failed to sync store contact in OrderReceipt:', err));
+  }, []);
 
   const handlePrint = () => {
     const printContent = printRef.current?.innerHTML;
@@ -245,9 +260,8 @@ export default function OrderReceipt({ order, onClose }: OrderReceiptProps) {
                 />
               </div>
               <div className="space-y-1 text-slate-600">
-                <p><span className="font-semibold text-slate-400">Address:</span> Dubai, UAE</p>
-                <p><span className="font-semibold text-slate-400">Email:</span> N/A</p>
-                <p><span className="font-semibold text-slate-400">Mobile number:</span> 01715838191</p>
+                <p><span className="font-semibold text-slate-400">Address:</span> Dubai, United Arab Emirates</p>
+                <p><span className="font-semibold text-slate-400">Mobile number:</span> {storeContact.phone}</p>
               </div>
             </div>
             <div className="sm:text-right space-y-1 text-slate-650 sm:self-start">
@@ -264,7 +278,6 @@ export default function OrderReceipt({ order, onClose }: OrderReceiptProps) {
             <h3 className="font-extrabold text-slate-900 text-sm mb-1">{order.customerName}</h3>
             <p className="text-slate-700 mb-1 leading-relaxed font-sans">{order.deliveryAddress}</p>
             <div className="space-y-0.5 text-slate-600 mt-2">
-              <p><span className="font-semibold text-slate-400">Email:</span> N/A</p>
               <p><span className="font-semibold text-slate-400">Mobile number:</span> <span className="font-mono">{order.customerMobile}</span></p>
             </div>
           </div>

@@ -65,6 +65,7 @@ const CATEGORIES_DB_PATH = path.join(process.cwd(), 'db_categories.json');
 const SHIPPING_AREAS_DB_PATH = path.join(process.cwd(), 'db_shipping_areas.json');
 const STORE_CONTACT_DB_PATH = path.join(process.cwd(), 'db_store_contact.json');
 const COUPONS_DB_PATH = path.join(process.cwd(), 'db_coupons.json');
+const SHOP_POLICIES_DB_PATH = path.join(process.cwd(), 'db_shop_policies.json');
 
 const INITIAL_STORE_CONTACT = [
   {
@@ -79,6 +80,17 @@ const INITIAL_COUPONS = [
   { id: 'coupon_1', code: 'RK10', discountPercent: 10, description: '10% OFF Discount Coupon', isActive: true },
   { id: 'coupon_2', code: 'SUPER20', discountPercent: 20, description: 'Super 20% discount coupon', isActive: true },
   { id: 'coupon_3', code: 'EID30', discountPercent: 30, description: 'Eid Special 30% discount coupon', isActive: true }
+];
+
+const INITIAL_SHOP_POLICIES = [
+  {
+    id: 'policies',
+    aboutUs: 'RK Furniture is a premium furniture provider based in Dubai, UAE, offering high-quality design elements.',
+    privacyPolicy: 'We respect your privacy. All customer data remains strictly confidential and secure.',
+    termsConditions: 'Standard service terms apply. Delivery details and times are calculated custom for each zone.',
+    refundPolicy: 'Refunds are managed based on specific defect reviews within 7 days of package delivery.',
+    cancelationPolicy: 'Orders may be cancelled within 12 hours. Returns may attract standard logistics costs.'
+  }
 ];
 
 // Helper function to read/write JSON databases
@@ -313,24 +325,6 @@ const INITIAL_SLIDES = [
     title: 'Sustainable Wooden Designs',
     subtitle: 'Experience classic artistry combined with durable modern aesthetics.',
     bg: 'https://images.unsplash.com/photo-1484101403633-562f891dc89a?auto=format&fit=crop&w=1200&q=80'
-  },
-  {
-    id: 'slide_3',
-    title: 'Cozy Royal Sofa Set',
-    subtitle: 'Designed for ultimate relaxation and supreme spinal comfort.',
-    bg: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80'
-  },
-  {
-    id: 'slide_4',
-    title: 'Luxury Bedroom Collections',
-    subtitle: 'Wooden bed frames crafted to give you a royal sleeping experience.',
-    bg: 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80'
-  },
-  {
-    id: 'slide_5',
-    title: 'Premium Dining Delights',
-    subtitle: 'Gather with your family on polished mahogany wood tables.',
-    bg: 'https://images.unsplash.com/photo-1617806118233-18e1db207f62?auto=format&fit=crop&w=1200&q=80'
   }
 ];
 
@@ -380,6 +374,9 @@ try {
   }
   if (!fs.existsSync(SHIPPING_AREAS_DB_PATH) || fs.readFileSync(SHIPPING_AREAS_DB_PATH, 'utf-8').trim() === '[]' || fs.readFileSync(SHIPPING_AREAS_DB_PATH, 'utf-8').trim() === '') {
     fs.writeFileSync(SHIPPING_AREAS_DB_PATH, JSON.stringify(INITIAL_SHIPPING_AREAS, null, 2), 'utf-8');
+  }
+  if (!fs.existsSync(SHOP_POLICIES_DB_PATH) || fs.readFileSync(SHOP_POLICIES_DB_PATH, 'utf-8').trim() === '[]' || fs.readFileSync(SHOP_POLICIES_DB_PATH, 'utf-8').trim() === '') {
+    fs.writeFileSync(SHOP_POLICIES_DB_PATH, JSON.stringify(INITIAL_SHOP_POLICIES, null, 2), 'utf-8');
   }
 } catch (e) {
   console.error('Error performing DB initial seeding:', e);
@@ -652,6 +649,41 @@ app.post('/api/store-contact', async (req, res) => {
   } catch (err) {
     console.error('Failed to update store contact:', err);
     res.status(500).json({ error: 'Failed to update help desk details' });
+  }
+});
+
+// SHOP POLICIES ENDPOINTS
+app.get('/api/shop-policies', async (req, res) => {
+  try {
+    const policies = await loadCollectionFromFirestore('shop_policies', SHOP_POLICIES_DB_PATH, INITIAL_SHOP_POLICIES);
+    res.json(policies[0] || INITIAL_SHOP_POLICIES[0]);
+  } catch (err) {
+    console.error('Failed to get shop policies:', err);
+    res.status(500).json({ error: 'Failed to load shop policies' });
+  }
+});
+
+app.post('/api/shop-policies', async (req, res) => {
+  try {
+    const { aboutUs, privacyPolicy, termsConditions, refundPolicy, cancelationPolicy } = req.body;
+    const updatedPolicies = {
+      id: 'policies',
+      aboutUs: aboutUs || '',
+      privacyPolicy: privacyPolicy || '',
+      termsConditions: termsConditions || '',
+      refundPolicy: refundPolicy || '',
+      cancelationPolicy: cancelationPolicy || ''
+    };
+    try {
+      await setDoc(doc(db, 'shop_policies', 'policies'), updatedPolicies);
+    } catch (firestoreErr) {
+      console.warn('Failed to save shop-policies to Firestore, proceeding with local disk save:', firestoreErr);
+    }
+    writeJSONFile(SHOP_POLICIES_DB_PATH, [updatedPolicies]);
+    res.json(updatedPolicies);
+  } catch (err) {
+    console.error('Failed to update shop policies:', err);
+    res.status(500).json({ error: 'Failed to save shop policies' });
   }
 });
 

@@ -61,7 +61,8 @@
         "id": { "type": "string" },
         "title": { "type": "string" },
         "subtitle": { "type": "string" },
-        "bg": { "type": "string" }
+        "bg": { "type": "string" },
+        "position": { "type": "string" }
       },
       "required": ["id", "title", "bg"]
     },
@@ -111,6 +112,20 @@
         "isActive": { "type": "boolean" }
       },
       "required": ["id", "code", "discountPercent", "isActive"]
+    },
+    "ShopPolicies": {
+      "title": "ShopPolicies",
+      "description": "Store terms and legal policies documents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "aboutUs": { "type": "string" },
+        "privacyPolicy": { "type": "string" },
+        "termsConditions": { "type": "string" },
+        "refundPolicy": { "type": "string" },
+        "cancelationPolicy": { "type": "string" }
+      },
+      "required": ["id", "aboutUs", "privacyPolicy", "termsConditions", "refundPolicy", "cancelationPolicy"]
     }
   },
   "firestore": {
@@ -145,6 +160,10 @@
     "/coupons/{couponId}": {
       "schema": "Coupon",
       "description": "Dynamic promo discount coupons"
+    },
+    "/shop_policies/{policyId}": {
+      "schema": "ShopPolicies",
+      "description": "Store about us, refund, terms, cancellation, privacy policies"
     }
   }
 }

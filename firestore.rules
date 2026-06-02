@@ -78,11 +78,12 @@ service cloud.firestore {
 
     function isValidSlide(data) {
       return data.keys().hasAll(['id', 'title', 'bg']) &&
-             data.keys().size() <= 4 &&
+             data.keys().size() <= 5 &&
              data.id is string && data.id.size() <= 100 &&
              data.title is string && data.title.size() <= 200 &&
              data.bg is string && data.bg.size() <= 1000 &&
-             (!data.keys().hasAny(['subtitle']) || (data.subtitle is string && data.subtitle.size() <= 500));
+             (!data.keys().hasAny(['subtitle']) || (data.subtitle is string && data.subtitle.size() <= 500)) &&
+             (!data.keys().hasAny(['position']) || (data.position is string && data.position.size() <= 50));
     }
 
     function isValidShippingArea(data) {
@@ -118,6 +119,17 @@ service cloud.firestore {
              data.discountPercent is number && data.discountPercent >= 0 && data.discountPercent <= 100 &&
              data.isActive is bool &&
              (!data.keys().hasAny(['description']) || (data.description is string && data.description.size() <= 500));
+    }
+
+    function isValidShopPolicies(data) {
+      return data.keys().hasAll(['id', 'aboutUs', 'privacyPolicy', 'termsConditions', 'refundPolicy', 'cancelationPolicy']) &&
+             data.keys().size() == 6 &&
+             data.id is string && data.id.size() <= 100 &&
+             data.aboutUs is string && data.aboutUs.size() <= 10000 &&
+             data.privacyPolicy is string && data.privacyPolicy.size() <= 10000 &&
+             data.termsConditions is string && data.termsConditions.size() <= 10000 &&
+             data.refundPolicy is string && data.refundPolicy.size() <= 10000 &&
+             data.cancelationPolicy is string && data.cancelationPolicy.size() <= 10000;
     }
 
     // 4. Collection Rule Declarations
@@ -173,6 +185,14 @@ service cloud.firestore {
       allow create: if isValidId(couponId) && isValidCoupon(incoming()) && (isAdmin() || !isSignedIn());
       allow update: if isValidId(couponId) && isValidCoupon(incoming()) && (isAdmin() || !isSignedIn());
       allow delete: if isValidId(couponId) && (isAdmin() || !isSignedIn());
+    }
+
+    // Shop Policies - Publicly readable, write only by Admin or system initialization
+    match /shop_policies/{policyId} {
+      allow read: if true;
+      allow create: if isValidId(policyId) && isValidShopPolicies(incoming()) && (isAdmin() || !isSignedIn());
+      allow update: if isValidId(policyId) && isValidShopPolicies(incoming()) && (isAdmin() || !isSignedIn());
+      allow delete: if isValidId(policyId) && (isAdmin() || !isSignedIn());
     }
 
     // Orders Placed Database - Anyone can read/place order, update fields
