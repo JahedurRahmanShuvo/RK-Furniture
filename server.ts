@@ -134,8 +134,14 @@ setInterval(() => {
   }
 }, 10000);
 
-// Generic function to load collection from Cloud Firestore with local sync and default fallback
-async function loadCollectionFromFirestore<T>(collectionName: string, localFilePath: string, defaultValue: T[]): Promise<T[]> {
+// In-Memory cache for all collections to ensure instant page loads
+const memoryCache: { [collectionName: string]: any[] } = {};
+let usersCache: { [phone: string]: any } | null = null;
+const syncedCollections: { [key: string]: boolean } = {};
+let hasUsersSynced = false;
+
+// Background fetch and sync routine for collections
+async function syncCollectionWithFirestoreInBackground(collectionName: string, localFilePath: string, defaultValue: any[]) {
   try {
     const colRef = collection(db, collectionName);
     const snapshot = await getDocs(colRef);
@@ -151,18 +157,20 @@ async function loadCollectionFromFirestore<T>(collectionName: string, localFileP
         firestoreItems.push(item);
       });
       
-      // Bidirectional Safe Merge: Keep local items that are NOT in Firestore, and auto-seed them up to Firestore!
+      // Bidirectional Safe Merge: Keep local items that are NOT in Firestore, and auto-seed them
       const mergedItems = [...firestoreItems];
       for (const localItem of localData) {
-        const alreadyInFirestore = firestoreItems.some(
-          (f) => String(f.id) === String(localItem.id)
-        );
-        if (!alreadyInFirestore && localItem && localItem.id) {
-          mergedItems.push(localItem);
-          const docId = String(localItem.id || Math.random());
-          await setDoc(doc(db, collectionName, docId), localItem).catch((err) => {
-            console.error(`[Automerge Seed Error] for ${collectionName}/${docId}:`, err);
-          });
+        if (localItem && localItem.id) {
+          const alreadyInFirestore = firestoreItems.some(
+            (f) => String(f.id) === String(localItem.id)
+          );
+          if (!alreadyInFirestore) {
+            mergedItems.push(localItem);
+            const docId = String(localItem.id);
+            setDoc(doc(db, collectionName, docId), localItem).catch((err) => {
+              console.error(`[Background Seed Error] for ${collectionName}/${docId}:`, err);
+            });
+          }
         }
       }
       
@@ -177,83 +185,147 @@ async function loadCollectionFromFirestore<T>(collectionName: string, localFileP
         mergedItems.sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
       }
 
-      // Refresh local JSON cache
+      // Refresh cache and local file
+      memoryCache[collectionName] = mergedItems;
       writeJSONFile(localFilePath, mergedItems);
-      return mergedItems as T[];
+      console.log(`[Background Sync Success] Synced ${collectionName}. Data count: ${mergedItems.length}`);
     } else {
-      // If Firestore is empty, seed from local JSON
+      // If Firestore is empty, seed from local JSON in background
       if (Array.isArray(localData) && localData.length > 0) {
-        console.log(`[Firestore Seed] Seeding collection: ${collectionName} with ${localData.length} records`);
+        console.log(`[Background Firestore Seed] Seeding collection: ${collectionName} with ${localData.length} records`);
         for (const item of localData) {
-          const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || Math.random());
-          await setDoc(doc(db, collectionName, docId), item);
+          if (item) {
+            const docId = String(item.id || item.orderNumber || item.name || Math.random());
+            setDoc(doc(db, collectionName, docId), item).catch((err) => {
+              console.error(`[Background Seed Error] for ${collectionName}/${docId}:`, err);
+            });
+          }
         }
       }
-      return localData as T[];
     }
   } catch (error) {
-    console.error(`[Firestore Sync Warning] Failed to fetch collection ${collectionName}:`, error);
-    return readJSONFile(localFilePath, defaultValue);
+    console.warn(`[Background Firestore Sync Warning] Failed to fetch collection ${collectionName} in background:`, error);
   }
 }
 
-// Save or edit a doc in Firestore
-async function saveDocToFirestore(collectionName: string, docId: string, data: any) {
-  try {
-    const docRef = doc(db, collectionName, docId);
-    await setDoc(docRef, data);
-  } catch (error) {
-    console.error(`[Firestore Sync Error] Failed to write document ${docId} in ${collectionName}:`, error);
-  }
-}
-
-// Delete a doc from Firestore
-async function deleteDocFromFirestore(collectionName: string, docId: string) {
-  try {
-    const docRef = doc(db, collectionName, docId);
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error(`[Firestore Sync Error] Failed to delete document ${docId} from ${collectionName}:`, error);
-  }
-}
-
-// Sync users collection
-async function loadUsersFromFirestore(): Promise<{ [key: string]: any }> {
+// Background users sync routine
+async function syncUsersWithFirestoreInBackground() {
   try {
     const colRef = collection(db, 'users');
     const snapshot = await getDocs(colRef);
     const localUsers = readJSONFile(USERS_DB_PATH, {});
-    const usersObj: { [key: string]: any } = {};
+    
     if (!snapshot.empty) {
+      const usersObj: { [key: string]: any } = {};
       snapshot.forEach((d) => {
         usersObj[d.id] = d.data();
       });
       
       // Merge local users who are not in Firestore
+      const mergedUsers = { ...usersObj };
       for (const phone in localUsers) {
-        if (!usersObj[phone]) {
-          usersObj[phone] = localUsers[phone];
-          await setDoc(doc(db, 'users', phone), localUsers[phone]).catch(() => {});
+        if (!mergedUsers[phone]) {
+          mergedUsers[phone] = localUsers[phone];
+          setDoc(doc(db, 'users', phone), localUsers[phone]).catch(() => {});
         }
       }
       
-      writeJSONFile(USERS_DB_PATH, usersObj);
-      return usersObj;
+      usersCache = mergedUsers;
+      writeJSONFile(USERS_DB_PATH, mergedUsers);
+      console.log('[Background Users Sync Success]');
     } else {
       for (const phone in localUsers) {
-        await setDoc(doc(db, 'users', phone), localUsers[phone]);
+        setDoc(doc(db, 'users', phone), localUsers[phone]).catch(() => {});
       }
-      return localUsers;
     }
   } catch (error) {
-    console.error(`[Firestore Sync Warning] Failed to load users:`, error);
-    return readJSONFile(USERS_DB_PATH, {});
+    console.warn(`[Background Users Sync Warning] Failed to load users in background:`, error);
   }
+}
+
+// Generic function to load collection from Cloud Firestore with local sync and default fallback
+async function loadCollectionFromFirestore<T>(collectionName: string, localFilePath: string, defaultValue: T[]): Promise<T[]> {
+  // 1. Return cached data or local disk data immediately of O(1) time
+  if (!memoryCache[collectionName]) {
+    memoryCache[collectionName] = readJSONFile(localFilePath, defaultValue);
+  }
+  const cachedData = memoryCache[collectionName] as T[];
+
+  // 2. Schedule non-blocking background synchronization if not done yet
+  if (!syncedCollections[collectionName]) {
+    syncedCollections[collectionName] = true;
+    syncCollectionWithFirestoreInBackground(collectionName, localFilePath, defaultValue).catch((err) => {
+      console.error(`[Background Sync Error Trigger] for ${collectionName}:`, err);
+    });
+  }
+
+  return cachedData;
+}
+
+// Save or edit a doc in Firestore (non-blocking)
+async function saveDocToFirestore(collectionName: string, docId: string, data: any) {
+  try {
+    // Sync memory cache first to keep UI instant
+    if (memoryCache[collectionName]) {
+      const colData = memoryCache[collectionName];
+      const index = colData.findIndex((item: any) => item.id === docId);
+      if (index !== -1) {
+        colData[index] = { ...colData[index], ...data };
+      } else {
+        colData.push(data);
+      }
+    }
+    
+    // Write in background
+    setDoc(doc(db, collectionName, docId), data).catch((error) => {
+      console.error(`[Background Write Error] Failed to upload ${docId} to ${collectionName}:`, error);
+    });
+  } catch (error) {
+    console.error(`[Firestore Sync Sync-Error] Failed to write document ${docId} in ${collectionName}:`, error);
+  }
+}
+
+// Delete a doc from Firestore (non-blocking)
+async function deleteDocFromFirestore(collectionName: string, docId: string) {
+  try {
+    // Sync memory cache first
+    if (memoryCache[collectionName]) {
+      memoryCache[collectionName] = memoryCache[collectionName].filter((item: any) => item.id !== docId);
+    }
+    
+    // Delete in background
+    deleteDoc(doc(db, collectionName, docId)).catch((error) => {
+      console.error(`[Background Delete Error] Failed to delete ${docId} from ${collectionName}:`, error);
+    });
+  } catch (error) {
+    console.error(`[Firestore Sync Sync-Error] Failed to delete document ${docId} from ${collectionName}:`, error);
+  }
+}
+
+// Sync users collection
+async function loadUsersFromFirestore(): Promise<{ [key: string]: any }> {
+  if (!usersCache) {
+    usersCache = readJSONFile(USERS_DB_PATH, {});
+  }
+  
+  if (!hasUsersSynced) {
+    hasUsersSynced = true;
+    syncUsersWithFirestoreInBackground().catch((err) => {
+      console.error('[Background Users Sync Trigger Error]:', err);
+    });
+  }
+  
+  return usersCache;
 }
 
 async function saveUserToFirestore(phone: string, userObj: any) {
   try {
-    await setDoc(doc(db, 'users', phone), userObj);
+    if (usersCache) {
+      usersCache[phone] = userObj;
+    }
+    setDoc(doc(db, 'users', phone), userObj).catch((err) => {
+      console.error('[Background Save User Error]:', err);
+    });
   } catch (error) {
     console.error(`[Firestore Sync Error] Failed to write user userObj:`, error);
   }
