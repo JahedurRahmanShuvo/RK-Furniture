@@ -1278,11 +1278,11 @@ export default function App() {
                     const currentSlide = topSlides[activeTopSlide] || topSlides[0];
                     if (!currentSlide) return null;
                     return (
-                      <div className="relative rounded-2xl overflow-hidden shadow-md border border-slate-100 flex items-center bg-slate-105 w-full h-auto mb-6">
+                      <div className="relative overflow-hidden w-full h-auto mb-6 flex items-center">
                         <img
                           src={currentSlide.bg}
                           alt="Top Banner"
-                          className="w-full h-auto block rounded-2xl"
+                          className="w-full h-auto block"
                           referrerPolicy="no-referrer"
                         />
                       </div>
@@ -1418,11 +1418,11 @@ export default function App() {
                 const currentSlide = middleSlides[activeMiddleSlide] || middleSlides[0];
                 if (!currentSlide) return null;
                 return (
-                  <div className="relative rounded-2xl overflow-hidden shadow-md border border-slate-100 flex items-center bg-slate-105 w-full h-auto">
+                  <div className="relative overflow-hidden w-full h-auto flex items-center">
                     <img
                       src={currentSlide.bg}
                       alt="Middle Banner"
-                      className="w-full h-auto block rounded-2xl"
+                      className="w-full h-auto block"
                       referrerPolicy="no-referrer"
                     />
                   </div>
