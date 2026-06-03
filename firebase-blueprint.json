@@ -126,6 +126,19 @@
         "cancelationPolicy": { "type": "string" }
       },
       "required": ["id", "aboutUs", "privacyPolicy", "termsConditions", "refundPolicy", "cancelationPolicy"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "Active user/visitor sessions for heartbeat online monitoring",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "deviceName": { "type": "string" },
+        "isAdmin": { "type": "boolean" },
+        "phone": { "type": "string" },
+        "lastSeen": { "type": "integer" }
+      },
+      "required": ["sessionId", "deviceName", "isAdmin", "lastSeen"]
     }
   },
   "firestore": {
@@ -164,6 +177,10 @@
     "/shop_policies/{policyId}": {
       "schema": "ShopPolicies",
       "description": "Store about us, refund, terms, cancellation, privacy policies"
+    },
+    "/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "Active real-time user browser session heartbeats"
     }
   }
 }

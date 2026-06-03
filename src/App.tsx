@@ -342,6 +342,12 @@ export default function App() {
             .then((data) => {
               if (data && typeof data === 'object') {
                 setRegisteredUsers(data);
+                if (currentPhone && data[currentPhone]) {
+                  const registered = data[currentPhone];
+                  if (Array.isArray(registered.addresses)) {
+                    setAddresses(registered.addresses);
+                  }
+                }
               }
             })
         ]);
@@ -454,7 +460,21 @@ export default function App() {
     try {
       localStorage.setItem('rk_addresses', JSON.stringify(addresses));
     } catch (_) {}
-  }, [addresses]);
+
+    if (user.isLoggedIn && user.phone) {
+      const currentUserData = registeredUsers[user.phone] || {};
+      const updatedUserObj = {
+        ...currentUserData,
+        addresses: addresses
+      };
+      
+      fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: user.phone, userObj: updatedUserObj })
+      }).catch((err) => console.error('Error syncing addresses to server:', err));
+    }
+  }, [addresses, user.isLoggedIn, user.phone]);
 
   // --- Active Navigation States ---
   const [view, setView] = useState<'home' | 'product_detail' | 'checkout' | 'order_success' | 'track_order' | 'dashboard' | 'auth' | 'trending_products' | 'admin_dashboard'>('home');
@@ -2795,19 +2815,46 @@ export default function App() {
                             setEditProfileMessage('Full Name and Phone are required.');
                             return;
                           }
+                          
+                          const previousUserObj = registeredUsers[user.phone] || {};
+                          const updatedUserObj = {
+                            ...previousUserObj,
+                            name: editName,
+                            email: editEmail,
+                            addresses: addresses
+                          };
+
                           setUser({
                             ...user,
                             name: editName,
                             phone: editPhone,
                             email: editEmail
                           });
-                          // Also store in registry
-                          setRegisteredUsers(prev => ({
-                            ...prev,
-                            [editPhone]: { name: editName, email: editEmail }
-                          }));
-                          setEditProfileMessage('Profile credentials updated successfully!');
-                          setTimeout(() => setEditProfileMessage(''), 3000);
+
+                          setRegisteredUsers(prev => {
+                            const next = { ...prev };
+                            if (user.phone && user.phone !== editPhone) {
+                              delete next[user.phone];
+                            }
+                            next[editPhone] = updatedUserObj;
+                            return next;
+                          });
+
+                          // Real-time synchronization of modified user profile to the cloud database
+                          fetch('/api/users', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ phone: editPhone, userObj: updatedUserObj })
+                          })
+                          .then((res) => res.json())
+                          .then(() => {
+                            setEditProfileMessage('Profile credentials updated successfully!');
+                            setTimeout(() => setEditProfileMessage(''), 3000);
+                          })
+                          .catch((err) => {
+                            console.error('Failed to sync profile to server:', err);
+                            setEditProfileMessage('Credentials saved locally, but online sync failed.');
+                          });
                         }}
                         className="text-xs space-y-3.5"
                       >

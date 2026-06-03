@@ -66,6 +66,7 @@ const SHIPPING_AREAS_DB_PATH = path.join(process.cwd(), 'db_shipping_areas.json'
 const STORE_CONTACT_DB_PATH = path.join(process.cwd(), 'db_store_contact.json');
 const COUPONS_DB_PATH = path.join(process.cwd(), 'db_coupons.json');
 const SHOP_POLICIES_DB_PATH = path.join(process.cwd(), 'db_shop_policies.json');
+const SESSIONS_DB_PATH = path.join(process.cwd(), 'db_sessions.json');
 
 const INITIAL_STORE_CONTACT = [
   {
@@ -124,15 +125,15 @@ interface ActiveSession {
 }
 const activeSessions: { [sessionId: string]: ActiveSession } = {};
 
-// Clean up expired sessions (older than 20 seconds) every 10 seconds
+// Clean up expired sessions (older than 24 hours) every 5 minutes
 setInterval(() => {
   const now = Date.now();
   for (const sessionId in activeSessions) {
-    if (now - activeSessions[sessionId].lastSeen > 20000) {
+    if (now - activeSessions[sessionId].lastSeen > 86400000) {
       delete activeSessions[sessionId];
     }
   }
-}, 10000);
+}, 300000);
 
 // In-Memory cache for all collections to ensure instant page loads
 const memoryCache: { [collectionName: string]: any[] } = {};
@@ -860,24 +861,60 @@ app.delete('/api/coupons/:id', async (req, res) => {
 });
 
 // 4. ACTIVE SESSIONS MONITORING
-app.post('/api/sessions/ping', (req, res) => {
+app.post('/api/sessions/ping', async (req, res) => {
   const { sessionId, deviceName, isAdmin, phone } = req.body;
   if (!sessionId) {
     return res.status(400).json({ error: 'Missing sessionId' });
   }
-  activeSessions[sessionId] = {
+  const sessionObj: ActiveSession = {
     sessionId,
     deviceName: deviceName || 'Unknown Device',
     isAdmin: !!isAdmin,
     phone: phone || '',
     lastSeen: Date.now()
   };
+  
+  // Update local memory-cache first
+  activeSessions[sessionId] = sessionObj;
+  
+  // Sync immediately to Firestore
+  try {
+    await saveDocToFirestore('sessions', sessionId, sessionObj);
+  } catch (error) {
+    console.error(`[Sessions Sync DB Error]:`, error);
+  }
+  
   res.json({ success: true });
 });
 
-app.get('/api/sessions/active', (req, res) => {
-  const list = Object.values(activeSessions);
-  res.json(list);
+app.get('/api/sessions/active', async (req, res) => {
+  try {
+    // Load sessions from Firestore using cached-with-seed logic
+    const list = await loadCollectionFromFirestore<ActiveSession>('sessions', SESSIONS_DB_PATH, []);
+    const now = Date.now();
+    
+    // Select sessions active within the last 24 hours
+    const activeAndOffline = list.filter((sess) => (now - Number(sess.lastSeen || 0)) <= 86400000);
+    
+    // Expired sessions cleaning from Firestore (older than 24 hours) (non-blocking async)
+    list.forEach((sess) => {
+      if ((now - Number(sess.lastSeen || 0)) > 86400000) {
+        deleteDocFromFirestore('sessions', sess.sessionId).catch(() => {});
+      }
+    });
+
+    // Populate back into local activeSessions memory cache
+    activeAndOffline.forEach((sess) => {
+      activeSessions[sess.sessionId] = sess;
+    });
+    
+    res.json(activeAndOffline);
+  } catch (err) {
+    console.warn('[Firestore sessions fetch failed], using local memory cache fallback:', err);
+    const now = Date.now();
+    const activeAndOffline = Object.values(activeSessions).filter((sess) => (now - Number(sess.lastSeen || 0)) <= 86400000);
+    res.json(activeAndOffline);
+  }
 });
 
 // --- Vite Middleware / Static Files Setup ---

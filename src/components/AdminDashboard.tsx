@@ -104,6 +104,10 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [confirmPassword, setConfirmPassword] = useState('');
   const [securityMessage, setSecurityMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  // Derived offline and online viewer sessions
+  const onlineSessions = activeSessions.filter((sess) => Date.now() - Number(sess.lastSeen || 0) <= 25000);
+  const offlineSessions = activeSessions.filter((sess) => Date.now() - Number(sess.lastSeen || 0) > 25000);
+
   // Time range selection ('today' | 'week' | 'month')
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('week');
 
@@ -1368,7 +1372,9 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 <Users className="w-5 h-5 text-cyan-600 z-10" />
               </div>
               <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 uppercase tracking-tight block leading-tight font-sans">Viewers List</span>
-              <span className="text-[8px] sm:text-[9px] text-cyan-700 font-bold block mt-0.5 font-mono">Active {activeSessions.length}</span>
+              <span className="text-[8px] sm:text-[9px] text-cyan-700 font-bold block mt-0.5 font-mono">
+                Online: {onlineSessions.length} | Offline: {offlineSessions.length}
+              </span>
             </button>
 
             {/* 4. Security */}
@@ -1802,6 +1808,16 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
           {/* 3. ACTIVE SESSIONS TAB */}
           {activeTab === 'sessions' && (
             <div className="space-y-4 text-left">
+              <div className="flex justify-between items-center bg-cyan-50/50 border border-cyan-100 p-3.5 rounded-xl">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-sans">Viewer Devices & Browsers</h4>
+                  <p className="text-[10px] text-slate-500 mt-1">Real-time active visitors and recent offline device logs from Google Firestore</p>
+                </div>
+                <div className="flex gap-2 text-[10px] font-mono">
+                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-md font-bold">Online: {onlineSessions.length}</span>
+                  <span className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded-md font-bold">Offline: {offlineSessions.length}</span>
+                </div>
+              </div>
 
               <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-150">
                 {activeSessions.length === 0 ? (
@@ -1809,47 +1825,74 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                     Waiting for device heartbeat pings...
                   </div>
                 ) : (
-                  activeSessions.map((sess, idx) => {
-                    const isSelf = sess.phone === user.phone && sess.isAdmin;
-                    return (
-                      <div key={idx} className="p-3 bg-white flex justify-between items-center text-xs">
-                        <div className="flex items-center gap-3">
-                          {sess.deviceName.toLowerCase().includes('desktop') || sess.deviceName.toLowerCase().includes('pc') || sess.deviceName.toLowerCase().includes('macos') || sess.deviceName.toLowerCase().includes('window') ? (
-                            <div className="bg-sky-50 text-sky-600 rounded-lg p-2 shrink-0 border border-sky-100">
-                              <Laptop className="w-5 h-5" />
-                            </div>
-                          ) : (
-                            <div className="bg-emerald-50 text-emerald-600 rounded-lg p-2 shrink-0 border border-emerald-100">
-                              <Phone className="w-5 h-5" />
-                            </div>
-                          )}
+                  [...activeSessions]
+                    .sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0))
+                    .map((sess, idx) => {
+                      const isSelf = sess.phone === user.phone && sess.isAdmin;
+                      const isOnline = Date.now() - Number(sess.lastSeen || 0) <= 25000;
+                      const elapsedMs = Date.now() - Number(sess.lastSeen || 0);
+                      let timeAgo = '';
+                      if (elapsedMs < 60000) {
+                        timeAgo = `${Math.floor(elapsedMs / 1000)}s ago`;
+                      } else if (elapsedMs < 3600000) {
+                        timeAgo = `${Math.floor(elapsedMs / 60000)}m ago`;
+                      } else if (elapsedMs < 86400000) {
+                        timeAgo = `${Math.floor(elapsedMs / 3600000)}h ago`;
+                      } else {
+                        timeAgo = 'more than 1d ago';
+                      }
 
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-800">{sess.deviceName}</span>
-                              {isSelf && (
-                                <span className="bg-amber-500 text-slate-950 font-bold text-[8px] px-1.5 rounded">YOU / ADMIN</span>
-                              )}
-                              {sess.isAdmin && !isSelf && (
-                                <span className="bg-[#15803d] text-white font-bold text-[8px] px-1.5 rounded border border-emerald-500">ADMIN</span>
-                              )}
+                      return (
+                        <div key={idx} className="p-3 bg-white flex justify-between items-center text-xs">
+                          <div className="flex items-center gap-3">
+                            {sess.deviceName.toLowerCase().includes('desktop') || sess.deviceName.toLowerCase().includes('pc') || sess.deviceName.toLowerCase().includes('macos') || sess.deviceName.toLowerCase().includes('window') ? (
+                              <div className="bg-sky-50 text-sky-600 rounded-lg p-2 shrink-0 border border-sky-100">
+                                <Laptop className="w-5 h-5" />
+                              </div>
+                            ) : (
+                              <div className="bg-emerald-50 text-emerald-600 rounded-lg p-2 shrink-0 border border-emerald-100">
+                                <Phone className="w-5 h-5" />
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="flex items-center gap-1.5 border-b border-dashed border-slate-100 pb-0.5">
+                                <span className="font-bold text-slate-800">{sess.deviceName}</span>
+                                {isSelf && (
+                                  <span className="bg-amber-500 text-slate-950 font-bold text-[8px] px-1.5 rounded">YOU / ADMIN</span>
+                                )}
+                                {sess.isAdmin && !isSelf && (
+                                  <span className="bg-[#15803d] text-white font-bold text-[8px] px-1.5 rounded border border-emerald-500">ADMIN</span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                Identity: <span className="font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded font-mono">{sess.phone || 'Anonymous Visitor'}</span>
+                              </p>
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-0.5">
-                              Identity: <span className="font-bold text-slate-700">{sess.phone || 'Anonymous Visitor'}</span>
-                            </p>
+                          </div>
+
+                          <div className="text-right space-y-1 font-mono">
+                            {isOnline ? (
+                              <>
+                                <span className="inline-flex items-center gap-1 text-[10px] text-[#40a832] font-semibold bg-[#40a832]/5 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                  <span className="w-1.5 h-1.5 bg-[#40a832] rounded-full animate-ping" />
+                                  Online
+                                </span>
+                                <span className="block text-[9px] text-slate-400">Seen just now</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-semibold bg-slate-100 px-2 py-0.5 rounded-full border border-slate-300/30">
+                                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
+                                  Offline
+                                </span>
+                                <span className="block text-[9px] text-slate-500">Active {timeAgo}</span>
+                              </>
+                            )}
                           </div>
                         </div>
-
-                        <div className="text-right space-y-1 font-mono">
-                          <span className="inline-flex items-center gap-1 text-[10px] text-[#40a832] font-semibold bg-[#40a832]/5 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                            <span className="w-1.5 h-1.5 bg-[#40a832] rounded-full animate-ping" />
-                            Online
-                          </span>
-                          <span className="block text-[9px] text-slate-500">Seen just now</span>
-                        </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })
                 )}
               </div>
             </div>
