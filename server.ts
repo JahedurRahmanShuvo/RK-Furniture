@@ -117,6 +117,7 @@ function writeJSONFile(filePath: string, data: any) {
 
 // Global in-memory registry for active sessions
 interface ActiveSession {
+  id?: string;
   sessionId: string;
   deviceName: string;
   isAdmin: boolean;
@@ -867,6 +868,7 @@ app.post('/api/sessions/ping', async (req, res) => {
     return res.status(400).json({ error: 'Missing sessionId' });
   }
   const sessionObj: ActiveSession = {
+    id: sessionId,
     sessionId,
     deviceName: deviceName || 'Unknown Device',
     isAdmin: !!isAdmin,
@@ -908,12 +910,32 @@ app.get('/api/sessions/active', async (req, res) => {
       activeSessions[sess.sessionId] = sess;
     });
     
-    res.json(activeAndOffline);
+    // Robust de-deduplication to avoid dashboard display inconsistencies (keeping the latest ping of each sessionId)
+    const uniqueMap: { [sid: string]: ActiveSession } = {};
+    activeAndOffline.forEach((sess) => {
+      const existing = uniqueMap[sess.sessionId];
+      if (!existing || Number(sess.lastSeen || 0) > Number(existing.lastSeen || 0)) {
+        uniqueMap[sess.sessionId] = sess;
+      }
+    });
+    const uniqueActiveAndOffline = Object.values(uniqueMap);
+    
+    res.json(uniqueActiveAndOffline);
   } catch (err) {
     console.warn('[Firestore sessions fetch failed], using local memory cache fallback:', err);
     const now = Date.now();
     const activeAndOffline = Object.values(activeSessions).filter((sess) => (now - Number(sess.lastSeen || 0)) <= 86400000);
-    res.json(activeAndOffline);
+    
+    const uniqueMap: { [sid: string]: ActiveSession } = {};
+    activeAndOffline.forEach((sess) => {
+      const existing = uniqueMap[sess.sessionId];
+      if (!existing || Number(sess.lastSeen || 0) > Number(existing.lastSeen || 0)) {
+        uniqueMap[sess.sessionId] = sess;
+      }
+    });
+    const uniqueActiveAndOffline = Object.values(uniqueMap);
+    
+    res.json(uniqueActiveAndOffline);
   }
 });
 
