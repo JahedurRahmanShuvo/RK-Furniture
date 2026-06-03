@@ -245,24 +245,59 @@ async function syncUsersWithFirestoreInBackground() {
 
 // Generic function to load collection from Cloud Firestore with local sync and default fallback
 async function loadCollectionFromFirestore<T>(collectionName: string, localFilePath: string, defaultValue: T[]): Promise<T[]> {
-  // 1. Return cached data or local disk data immediately of O(1) time
+  try {
+    const colRef = collection(db, collectionName);
+    const snapshot = await getDocs(colRef);
+    if (!snapshot.empty) {
+      const firestoreItems: T[] = [];
+      snapshot.forEach((d) => {
+        const item = d.data() as any;
+        if (item && !item.id) {
+          item.id = d.id;
+        }
+        firestoreItems.push(item);
+      });
+
+      // Maintain sorting
+      if (collectionName === 'orders') {
+        firestoreItems.sort((a: any, b: any) => {
+          const idA = String(a.id || '');
+          const idB = String(b.id || '');
+          return idB.localeCompare(idA);
+        });
+      } else {
+        firestoreItems.sort((a: any, b: any) => String(a.id || '').localeCompare(String(b.id || '')));
+      }
+
+      memoryCache[collectionName] = firestoreItems;
+      writeJSONFile(localFilePath, firestoreItems);
+      return firestoreItems;
+    } else {
+      // If Firestore is empty, seed from local JSON if available and sync it up
+      const localData = readJSONFile(localFilePath, defaultValue) as T[];
+      if (Array.isArray(localData) && localData.length > 0) {
+        for (const item of localData) {
+          if (item) {
+            const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || Math.random());
+            setDoc(doc(db, collectionName, docId), item).catch(() => {});
+          }
+        }
+      }
+      memoryCache[collectionName] = localData;
+      return localData;
+    }
+  } catch (error) {
+    console.warn(`[Firestore Fetch Failed for ${collectionName}], using fallback:`, error);
+  }
+
+  // Fallback to local memory / file
   if (!memoryCache[collectionName]) {
     memoryCache[collectionName] = readJSONFile(localFilePath, defaultValue);
   }
-  const cachedData = memoryCache[collectionName] as T[];
-
-  // 2. Schedule non-blocking background synchronization if not done yet
-  if (!syncedCollections[collectionName]) {
-    syncedCollections[collectionName] = true;
-    syncCollectionWithFirestoreInBackground(collectionName, localFilePath, defaultValue).catch((err) => {
-      console.error(`[Background Sync Error Trigger] for ${collectionName}:`, err);
-    });
-  }
-
-  return cachedData;
+  return memoryCache[collectionName] as T[];
 }
 
-// Save or edit a doc in Firestore (non-blocking)
+// Save or edit a doc in Firestore (non-blocking but immediately updating cache)
 async function saveDocToFirestore(collectionName: string, docId: string, data: any) {
   try {
     // Sync memory cache first to keep UI instant
@@ -276,16 +311,14 @@ async function saveDocToFirestore(collectionName: string, docId: string, data: a
       }
     }
     
-    // Write in background
-    setDoc(doc(db, collectionName, docId), data).catch((error) => {
-      console.error(`[Background Write Error] Failed to upload ${docId} to ${collectionName}:`, error);
-    });
+    // Write to Firestore and local disk
+    await setDoc(doc(db, collectionName, docId), data);
   } catch (error) {
-    console.error(`[Firestore Sync Sync-Error] Failed to write document ${docId} in ${collectionName}:`, error);
+    console.error(`[Firestore Sync-Error] Failed to write document ${docId} in ${collectionName}:`, error);
   }
 }
 
-// Delete a doc from Firestore (non-blocking)
+// Delete a doc from Firestore
 async function deleteDocFromFirestore(collectionName: string, docId: string) {
   try {
     // Sync memory cache first
@@ -293,28 +326,42 @@ async function deleteDocFromFirestore(collectionName: string, docId: string) {
       memoryCache[collectionName] = memoryCache[collectionName].filter((item: any) => item.id !== docId);
     }
     
-    // Delete in background
-    deleteDoc(doc(db, collectionName, docId)).catch((error) => {
-      console.error(`[Background Delete Error] Failed to delete ${docId} from ${collectionName}:`, error);
-    });
+    // Delete from Firestore
+    await deleteDoc(doc(db, collectionName, docId));
   } catch (error) {
-    console.error(`[Firestore Sync Sync-Error] Failed to delete document ${docId} from ${collectionName}:`, error);
+    console.error(`[Firestore Sync-Error] Failed to delete document ${docId} from ${collectionName}:`, error);
   }
 }
 
 // Sync users collection
 async function loadUsersFromFirestore(): Promise<{ [key: string]: any }> {
+  try {
+    const colRef = collection(db, 'users');
+    const snapshot = await getDocs(colRef);
+    if (!snapshot.empty) {
+      const usersObj: { [key: string]: any } = {};
+      snapshot.forEach((d) => {
+        usersObj[d.id] = d.data();
+      });
+      usersCache = usersObj;
+      writeJSONFile(USERS_DB_PATH, usersObj);
+      return usersObj;
+    } else {
+      // If Firestore is empty, seed from local JSON
+      const localUsers = readJSONFile(USERS_DB_PATH, {});
+      for (const phone in localUsers) {
+        setDoc(doc(db, 'users', phone), localUsers[phone]).catch(() => {});
+      }
+      usersCache = localUsers;
+      return localUsers;
+    }
+  } catch (error) {
+    console.warn('[Firestore loadUsers failed], using local fallback:', error);
+  }
+
   if (!usersCache) {
     usersCache = readJSONFile(USERS_DB_PATH, {});
   }
-  
-  if (!hasUsersSynced) {
-    hasUsersSynced = true;
-    syncUsersWithFirestoreInBackground().catch((err) => {
-      console.error('[Background Users Sync Trigger Error]:', err);
-    });
-  }
-  
   return usersCache;
 }
 
@@ -323,9 +370,7 @@ async function saveUserToFirestore(phone: string, userObj: any) {
     if (usersCache) {
       usersCache[phone] = userObj;
     }
-    setDoc(doc(db, 'users', phone), userObj).catch((err) => {
-      console.error('[Background Save User Error]:', err);
-    });
+    await setDoc(doc(db, 'users', phone), userObj);
   } catch (error) {
     console.error(`[Firestore Sync Error] Failed to write user userObj:`, error);
   }

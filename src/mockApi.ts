@@ -186,136 +186,130 @@ import {
 
 // In-memory caches for Netlify browsers to provide instant responses
 const inMemoryCache: { [colName: string]: any[] } = {};
-const syncedCols: { [colName: string]: boolean } = {};
 let cachedUsers: { [key: string]: any } | null = null;
-let isUsersSynced = false;
 
-// Helper to fetch collection directly from Firestore with fallback & seeding (non-blocking, fast loading!)
+// Helper to fetch collection directly from Firestore with fallback & seeding
 async function getFirestoreCollection<T>(collectionName: string, defaultValue: T[]): Promise<T[]> {
-  // 1. Return in-memory cache if already populated
-  if (inMemoryCache[collectionName]) {
-    return inMemoryCache[collectionName] as T[];
-  }
+  try {
+    const colRef = collection(db, collectionName);
+    const snapshot = await getDocs(colRef);
+    
+    // Check if system has been seeded before
+    const seedRef = doc(db, 'system_meta', 'seed_status');
+    const seedSnap = await getDoc(seedRef);
+    const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
 
-  // 2. Fallback to localStorage cache for instant boot
-  const cacheKey = `netlify_${collectionName}`;
-  const stored = localStorage.getItem(cacheKey);
-  let cachedData = defaultValue;
-  if (stored) {
-    try {
-      cachedData = JSON.parse(stored);
-    } catch (e) {
-      cachedData = defaultValue;
-    }
-  }
+    const cacheKey = `netlify_${collectionName}`;
 
-  inMemoryCache[collectionName] = cachedData;
-
-  // 3. Trigger asynchronous background sync if not already done in this session
-  if (!syncedCols[collectionName]) {
-    syncedCols[collectionName] = true;
-    (async () => {
-      try {
-        const colRef = collection(db, collectionName);
-        const snapshot = await getDocs(colRef);
-        
-        // Check if system has been seeded before
-        const seedRef = doc(db, 'system_meta', 'seed_status');
-        const seedSnap = await getDoc(seedRef);
-        const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
-
-        if (!snapshot.empty) {
-          const items: T[] = [];
-          snapshot.forEach((d) => {
-            items.push({ ...d.data() } as any);
-          });
-          // Sort collections
-          if (collectionName === 'orders') {
-            (items as any[]).sort((a, b) => {
-              const idA = String(a.id || '');
-              const idB = String(b.id || '');
-              return idB.localeCompare(idA);
-            });
-          } else {
-            (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
-          }
-
-          // Update cache of O(1) reads
-          inMemoryCache[collectionName] = items;
-          localStorage.setItem(cacheKey, JSON.stringify(items));
-        } else {
-          // Seed Firestore with default value only if the DB has NEVER been seeded before
-          if (!isSeeded && defaultValue.length > 0) {
-            for (const item of defaultValue) {
-              const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
-              await setDoc(doc(db, collectionName, docId), item);
-            }
-            await setDoc(seedRef, { seeded: true });
-          }
-        }
-      } catch (err) {
-        console.warn(`[Background Firestore sync fallback] failed for ${collectionName}:`, err);
+    if (!snapshot.empty) {
+      const items: T[] = [];
+      snapshot.forEach((d) => {
+        items.push({ ...d.data() } as any);
+      });
+      // Sort collections
+      if (collectionName === 'orders') {
+        (items as any[]).sort((a, b) => {
+          const idA = String(a.id || '');
+          const idB = String(b.id || '');
+          return idB.localeCompare(idA);
+        });
+      } else {
+        (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
       }
-    })();
-  }
 
-  return cachedData as T[];
+      // Update local and memory cache
+      inMemoryCache[collectionName] = items;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(items));
+      } catch (_) {}
+      return items;
+    } else {
+      // Seed Firestore with default value only if the DB has NEVER been seeded before
+      if (!isSeeded && defaultValue.length > 0) {
+        for (const item of defaultValue) {
+          const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
+          await setDoc(doc(db, collectionName, docId), item);
+        }
+        await setDoc(seedRef, { seeded: true });
+        
+        inMemoryCache[collectionName] = defaultValue;
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(defaultValue));
+        } catch (_) {}
+        return defaultValue;
+      }
+      
+      // If seeded but empty, return empty list (user cleared it)
+      inMemoryCache[collectionName] = [];
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify([]));
+      } catch (_) {}
+      return [];
+    }
+  } catch (err) {
+    console.warn(`[Firestore sync fallback] Failed for ${collectionName}:`, err);
+    // Fallback to local cache in case of offline/network issues
+    const cacheKey = `netlify_${collectionName}`;
+    const stored = localStorage.getItem(cacheKey);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return defaultValue;
+      }
+    }
+    return defaultValue;
+  }
 }
 
 async function getFirestoreUsers(): Promise<{ [key: string]: any }> {
-  // 1. Return cached users instantly if available
-  if (cachedUsers) {
-    return cachedUsers;
-  }
+  try {
+    const colRef = collection(db, 'users');
+    const snapshot = await getDocs(colRef);
+    
+    const seedRef = doc(db, 'system_meta', 'seed_status');
+    const seedSnap = await getDoc(seedRef);
+    const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
 
-  // 2. Retrieve offline cache instantly
-  const stored = localStorage.getItem('rk_registered_users');
-  let usersData = DEFAULT_USERS;
-  if (stored) {
-    try {
-      usersData = JSON.parse(stored);
-    } catch {
-      usersData = DEFAULT_USERS;
-    }
-  }
-
-  cachedUsers = usersData;
-
-  // 3. Sync users database in background
-  if (!isUsersSynced) {
-    isUsersSynced = true;
-    (async () => {
+    if (!snapshot.empty) {
+      const usersObj: { [key: string]: any } = {};
+      snapshot.forEach((d) => {
+        usersObj[d.id] = d.data();
+      });
+      
+      cachedUsers = usersObj;
       try {
-        const colRef = collection(db, 'users');
-        const snapshot = await getDocs(colRef);
-        
-        const seedRef = doc(db, 'system_meta', 'seed_status');
-        const seedSnap = await getDoc(seedRef);
-        const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
-
-        if (!snapshot.empty) {
-          const usersObj: { [key: string]: any } = {};
-          snapshot.forEach((d) => {
-            usersObj[d.id] = d.data();
-          });
-          
-          cachedUsers = usersObj;
-          localStorage.setItem('rk_registered_users', JSON.stringify(usersObj));
-        } else {
-          if (!isSeeded) {
-            for (const phone in DEFAULT_USERS) {
-              await setDoc(doc(db, 'users', phone), (DEFAULT_USERS as any)[phone]);
-            }
-            await setDoc(seedRef, { seeded: true });
-          }
+        localStorage.setItem('rk_registered_users', JSON.stringify(usersObj));
+      } catch (_) {}
+      return usersObj;
+    } else {
+      if (!isSeeded) {
+        for (const phone in DEFAULT_USERS) {
+          await setDoc(doc(db, 'users', phone), (DEFAULT_USERS as any)[phone]);
         }
-      } catch (err) {
-        console.warn(`[Background Firestore users sync error]`, err);
+        await setDoc(seedRef, { seeded: true });
+        
+        cachedUsers = DEFAULT_USERS;
+        try {
+          localStorage.setItem('rk_registered_users', JSON.stringify(DEFAULT_USERS));
+        } catch (_) {}
+        return DEFAULT_USERS;
       }
-    })();
+      return {};
+    }
+  } catch (err) {
+    console.warn(`[Firestore users sync error]`, err);
+    // Fallback to local cache
+    const stored = localStorage.getItem('rk_registered_users');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return DEFAULT_USERS;
+      }
+    }
+    return DEFAULT_USERS;
   }
-
-  return usersData;
 }
 
 async function saveFirestoreDoc(collectionName: string, docId: string, data: any) {
@@ -329,6 +323,7 @@ async function saveFirestoreDoc(collectionName: string, docId: string, data: any
       }
       dict[docId] = data;
       localStorage.setItem('rk_registered_users', JSON.stringify(dict));
+      cachedUsers = dict;
     } else {
       const stored = localStorage.getItem(`netlify_${collectionName}`);
       let list: any[] = [];
@@ -348,19 +343,18 @@ async function saveFirestoreDoc(collectionName: string, docId: string, data: any
         list.push(itemToSave);
       }
       localStorage.setItem(`netlify_${collectionName}`, JSON.stringify(list));
+      inMemoryCache[collectionName] = list;
     }
   } catch (err) {
     console.warn(`[Local cache write fallback error] pre-sync update failed:`, err);
   }
 
-  // 2. Perform Firestore write (non-blocking in background)
+  // 2. Perform Firestore write (non-blocking in background, but securely handled)
   try {
     const docRef = doc(db, collectionName, docId);
-    setDoc(docRef, data).catch((err) => {
-      console.warn(`[Firestore saveDoc background write failed] ${collectionName}/${docId}:`, err);
-    });
+    await setDoc(docRef, data);
   } catch (err) {
-    console.error(`[Firestore saveDoc setup error] ${collectionName}/${docId}:`, err);
+    console.warn(`[Firestore saveDoc write failed] ${collectionName}/${docId}:`, err);
   }
 }
 
@@ -374,6 +368,7 @@ async function deleteFirestoreDoc(collectionName: string, docId: string) {
           const dict = JSON.parse(stored);
           delete dict[docId];
           localStorage.setItem('rk_registered_users', JSON.stringify(dict));
+          cachedUsers = dict;
         } catch {}
       }
     } else {
@@ -386,6 +381,7 @@ async function deleteFirestoreDoc(collectionName: string, docId: string) {
             return itemId !== String(docId);
           });
           localStorage.setItem(`netlify_${collectionName}`, JSON.stringify(list));
+          inMemoryCache[collectionName] = list;
         } catch {}
       }
     }
@@ -393,14 +389,12 @@ async function deleteFirestoreDoc(collectionName: string, docId: string) {
     console.warn(`[Local cache write fallback error] pre-sync delete failed:`, err);
   }
 
-  // 2. Perform Firestore delete (non-blocking in background)
+  // 2. Perform Firestore delete
   try {
     const docRef = doc(db, collectionName, docId);
-    deleteDoc(docRef).catch((err) => {
-      console.warn(`[Firestore deleteDoc background delete failed] ${collectionName}/${docId}:`, err);
-    });
+    await deleteDoc(docRef);
   } catch (err) {
-    console.error(`[Firestore deleteDoc setup error] ${collectionName}/${docId}:`, err);
+    console.warn(`[Firestore deleteDoc delete failed] ${collectionName}/${docId}:`, err);
   }
 }
 
