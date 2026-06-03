@@ -1,8 +1,94 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- GLOBAL SAFETY NET ---
     match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- REUSABLE SECURITY PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'admin@rkfurniture.com' ||
+        request.auth.token.email == 'shuvojahedurrahman15@gmail.com'
+      );
+    }
+
+    // --- PRODUCTS COLLECTION ---
+    match /products/{productId} {
+      allow read: if true; // Public catalog access
+      allow write: if isAdmin(); // Admin restricted write access
+    }
+
+    // --- CATEGORIES COLLECTION ---
+    match /categories/{categoryId} {
+      allow read: if true; // Public catalog access
+      allow write: if isAdmin(); // Admin restricted write access
+    }
+
+    // --- SLIDES (PROMO BANNERS) COLLECTION ---
+    match /slides/{slideId} {
+      allow read: if true; // Public slide banner viewing
+      allow write: if isAdmin(); // Admin restricted write access
+    }
+
+    // --- SHIPPING AREAS COLLECTION ---
+    match /shipping_areas/{areaId} {
+      allow read: if true; // Public shipping pricing visibility
+      allow write: if isAdmin(); // Admin restricted write access
+    }
+
+    // --- STORE CONTACT (CHAT HELP DESK) COLLECTION ---
+    match /store_contact/{contactId} {
+      allow read: if true; // Public support details viewing
+      allow write: if isAdmin(); // Admin restricted write access
+    }
+
+    // --- SHOP POLICIES COLLECTION ---
+    match /shop_policies/{policyId} {
+      allow read: if true; // Public terms/privacy policies visibility
+      allow write: if isAdmin(); // Admin restricted write access
+    }
+
+    // --- COUPONS COLLECTION ---
+    match /coupons/{couponId} {
+      allow read: if true; // Public coupons check
+      allow write: if isAdmin(); // Admin restricted write access
+    }
+
+    // --- SESSIONS (VIEWERS / VISITOR SESSIONS) COLLECTION ---
+    match /sessions/{sessionId} {
+      // Allows active heartbeat registration for real-time monitoring of online visitors
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // --- SYSTEM METADATA COLLECTION ---
+    match /system_meta/{metaId} {
       allow read, write: if true;
+    }
+
+    // --- USERS PROFILE COLLECTION ---
+    match /users/{phone} {
+      // Allow read so that guest visitors during login/registration/forgot password can verify existences
+      allow read: if true;
+      allow create, update: if isAdmin() || true;
+      allow delete: if isAdmin();
+    }
+
+    // --- ORDERS COLLECTION ---
+    match /orders/{orderId} {
+      // Allows customers to place orders (guest and registered checkouts), and track order status
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAdmin() || true;
+      allow delete: if isAdmin();
     }
   }
 }
