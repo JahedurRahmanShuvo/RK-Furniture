@@ -190,23 +190,93 @@ let cachedUsers: { [key: string]: any } | null = null;
 
 // Helper to fetch collection directly from Firestore with fallback & seeding
 async function getFirestoreCollection<T>(collectionName: string, defaultValue: T[]): Promise<T[]> {
+  const cacheKey = `netlify_${collectionName}`;
+
+  // 1. Check in-memory cache
+  if (inMemoryCache[collectionName] && inMemoryCache[collectionName].length > 0) {
+    // Return instantly, fetch in background silently
+    triggerBackgroundRefresh(collectionName, defaultValue).catch(() => {});
+    return inMemoryCache[collectionName] as T[];
+  }
+
+  // 2. Check localStorage
+  try {
+    const stored = localStorage.getItem(cacheKey);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        inMemoryCache[collectionName] = parsed;
+        // Return instantly, fetch in background silently
+        triggerBackgroundRefresh(collectionName, defaultValue).catch(() => {});
+        return parsed as T[];
+      }
+    }
+  } catch (_) {}
+
+  // 3. Fallback: Await direct Firestore fetch
+  return await fetchAndCacheFirestoreCollection(collectionName, defaultValue);
+}
+
+// Background collection refresh helper
+async function triggerBackgroundRefresh(collectionName: string, defaultValue: any[]): Promise<void> {
   try {
     const colRef = collection(db, collectionName);
     const snapshot = await getDocs(colRef);
-    
-    // Check if system has been seeded before
-    const seedRef = doc(db, 'system_meta', 'seed_status');
-    const seedSnap = await getDoc(seedRef);
-    const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
+    const cacheKey = `netlify_${collectionName}`;
 
+    if (!snapshot.empty) {
+      const items: any[] = [];
+      snapshot.forEach((d) => {
+        const item = d.data() as any;
+        if (item) {
+          if (!item.id) {
+            item.id = d.id;
+          }
+          items.push(item);
+        }
+      });
+
+      // Maintain sorting
+      if (collectionName === 'orders') {
+        items.sort((a, b) => {
+          const idA = String(a.id || '');
+          const idB = String(b.id || '');
+          return idB.localeCompare(idA);
+        });
+      } else {
+        items.sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      }
+
+      inMemoryCache[collectionName] = items;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(items));
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.warn(`[Background Refresh Sync Warning] failed for ${collectionName}:`, err);
+  }
+}
+
+// Initial full direct fetch & seed logic
+async function fetchAndCacheFirestoreCollection<T>(collectionName: string, defaultValue: T[]): Promise<T[]> {
+  try {
+    const colRef = collection(db, collectionName);
+    const snapshot = await getDocs(colRef);
     const cacheKey = `netlify_${collectionName}`;
 
     if (!snapshot.empty) {
       const items: T[] = [];
       snapshot.forEach((d) => {
-        items.push({ ...d.data() } as any);
+        const item = d.data() as any;
+        if (item) {
+          if (!item.id) {
+            item.id = d.id;
+          }
+          items.push(item);
+        }
       });
-      // Sort collections
+
+      // Maintain sorting
       if (collectionName === 'orders') {
         (items as any[]).sort((a, b) => {
           const idA = String(a.id || '');
@@ -217,29 +287,35 @@ async function getFirestoreCollection<T>(collectionName: string, defaultValue: T
         (items as any[]).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
       }
 
-      // Update local and memory cache
       inMemoryCache[collectionName] = items;
       try {
         localStorage.setItem(cacheKey, JSON.stringify(items));
       } catch (_) {}
       return items;
     } else {
-      // Seed Firestore with default value only if the DB has NEVER been seeded before
+      // Seed Firestore with default value only if the DB has NEVER been seeded
+      const seedRef = doc(db, 'system_meta', 'seed_status');
+      const seedSnap = await getDoc(seedRef);
+      const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
+
       if (!isSeeded && defaultValue.length > 0) {
         for (const item of defaultValue) {
           const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
-          await setDoc(doc(db, collectionName, docId), item);
+          const docPayload = { ...item };
+          if (!(docPayload as any).id) {
+            (docPayload as any).id = docId;
+          }
+          await setDoc(doc(db, collectionName, docId), docPayload);
         }
         await setDoc(seedRef, { seeded: true });
-        
+
         inMemoryCache[collectionName] = defaultValue;
         try {
           localStorage.setItem(cacheKey, JSON.stringify(defaultValue));
         } catch (_) {}
         return defaultValue;
       }
-      
-      // If seeded but empty, return empty list (user cleared it)
+
       inMemoryCache[collectionName] = [];
       try {
         localStorage.setItem(cacheKey, JSON.stringify([]));
@@ -247,8 +323,7 @@ async function getFirestoreCollection<T>(collectionName: string, defaultValue: T
       return [];
     }
   } catch (err) {
-    console.warn(`[Firestore sync fallback] Failed for ${collectionName}:`, err);
-    // Fallback to local cache in case of offline/network issues
+    console.warn(`[Firestore first-load sync fallback] Failed for ${collectionName}:`, err);
     const cacheKey = `netlify_${collectionName}`;
     const stored = localStorage.getItem(cacheKey);
     if (stored) {
@@ -263,43 +338,88 @@ async function getFirestoreCollection<T>(collectionName: string, defaultValue: T
 }
 
 async function getFirestoreUsers(): Promise<{ [key: string]: any }> {
+  // 1. Check in-memory cache
+  if (cachedUsers && Object.keys(cachedUsers).length > 0) {
+    triggerBackgroundUsersRefresh().catch(() => {});
+    return cachedUsers;
+  }
+
+  // 2. Check localStorage
+  try {
+    const stored = localStorage.getItem('rk_registered_users');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+        cachedUsers = parsed;
+        triggerBackgroundUsersRefresh().catch(() => {});
+        return parsed;
+      }
+    }
+  } catch (_) {}
+
+  // 3. Fallback: Await direct Firestore fetch
+  return await fetchAndCacheFirestoreUsers();
+}
+
+async function triggerBackgroundUsersRefresh(): Promise<void> {
   try {
     const colRef = collection(db, 'users');
     const snapshot = await getDocs(colRef);
-    
-    const seedRef = doc(db, 'system_meta', 'seed_status');
-    const seedSnap = await getDoc(seedRef);
-    const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
+    if (!snapshot.empty) {
+      const usersObj: { [key: string]: any } = {};
+      snapshot.forEach((d) => {
+        usersObj[d.id] = d.data();
+      });
+      cachedUsers = usersObj;
+      try {
+        localStorage.setItem('rk_registered_users', JSON.stringify(usersObj));
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.warn('[Background Users Refresh Sync Warning] failed:', err);
+  }
+}
+
+async function fetchAndCacheFirestoreUsers(): Promise<{ [key: string]: any }> {
+  try {
+    const colRef = collection(db, 'users');
+    const snapshot = await getDocs(colRef);
 
     if (!snapshot.empty) {
       const usersObj: { [key: string]: any } = {};
       snapshot.forEach((d) => {
         usersObj[d.id] = d.data();
       });
-      
       cachedUsers = usersObj;
       try {
         localStorage.setItem('rk_registered_users', JSON.stringify(usersObj));
       } catch (_) {}
       return usersObj;
     } else {
+      const seedRef = doc(db, 'system_meta', 'seed_status');
+      const seedSnap = await getDoc(seedRef);
+      const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
+
       if (!isSeeded) {
         for (const phone in DEFAULT_USERS) {
           await setDoc(doc(db, 'users', phone), (DEFAULT_USERS as any)[phone]);
         }
         await setDoc(seedRef, { seeded: true });
-        
+
         cachedUsers = DEFAULT_USERS;
         try {
           localStorage.setItem('rk_registered_users', JSON.stringify(DEFAULT_USERS));
         } catch (_) {}
         return DEFAULT_USERS;
       }
+      cachedUsers = {};
+      try {
+        localStorage.setItem('rk_registered_users', JSON.stringify({}));
+      } catch (_) {}
       return {};
     }
   } catch (err) {
-    console.warn(`[Firestore users sync error]`, err);
-    // Fallback to local cache
+    console.warn('[Firestore users sync fallback] failed:', err);
     const stored = localStorage.getItem('rk_registered_users');
     if (stored) {
       try {
@@ -313,6 +433,12 @@ async function getFirestoreUsers(): Promise<{ [key: string]: any }> {
 }
 
 async function saveFirestoreDoc(collectionName: string, docId: string, data: any) {
+  // Ensure the id field inside data matches docID for seamless front-end sorting and admin tables
+  const itemToSave = { ...data };
+  if (!itemToSave.id) {
+    itemToSave.id = docId;
+  }
+
   // 1. Maintain robust offline-first local cache backup
   try {
     if (collectionName === 'users') {
@@ -321,7 +447,7 @@ async function saveFirestoreDoc(collectionName: string, docId: string, data: any
       if (stored) {
         try { dict = JSON.parse(stored); } catch { dict = {}; }
       }
-      dict[docId] = data;
+      dict[docId] = itemToSave;
       localStorage.setItem('rk_registered_users', JSON.stringify(dict));
       cachedUsers = dict;
     } else {
@@ -331,8 +457,6 @@ async function saveFirestoreDoc(collectionName: string, docId: string, data: any
         try { list = JSON.parse(stored); } catch { list = []; }
       }
       
-      // Keep it up to date/append
-      const itemToSave = { ...data };
       const idx = list.findIndex((item: any) => {
         const itemId = String(item.id || item.orderNumber || '');
         return itemId === String(docId);
@@ -352,7 +476,7 @@ async function saveFirestoreDoc(collectionName: string, docId: string, data: any
   // 2. Perform Firestore write (non-blocking in background, but securely handled)
   try {
     const docRef = doc(db, collectionName, docId);
-    await setDoc(docRef, data);
+    await setDoc(docRef, itemToSave);
   } catch (err) {
     console.warn(`[Firestore saveDoc write failed] ${collectionName}/${docId}:`, err);
   }

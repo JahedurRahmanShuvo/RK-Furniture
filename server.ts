@@ -247,6 +247,66 @@ async function syncUsersWithFirestoreInBackground() {
 
 // Generic function to load collection from Cloud Firestore with local sync and default fallback
 async function loadCollectionFromFirestore<T>(collectionName: string, localFilePath: string, defaultValue: T[]): Promise<T[]> {
+  // 1. Check in-memory cache
+  if (memoryCache[collectionName] && memoryCache[collectionName].length > 0) {
+    triggerServerBackgroundRefresh(collectionName, localFilePath, defaultValue).catch(() => {});
+    return memoryCache[collectionName] as T[];
+  }
+
+  // 2. Check local JSON file on the server's disk
+  if (fs.existsSync(localFilePath)) {
+    try {
+      const fileData = readJSONFile(localFilePath, defaultValue) as T[];
+      if (Array.isArray(fileData) && fileData.length > 0) {
+        memoryCache[collectionName] = fileData;
+        triggerServerBackgroundRefresh(collectionName, localFilePath, defaultValue).catch(() => {});
+        return fileData;
+      }
+    } catch (_) {}
+  }
+
+  // 3. Fallback: Await direct Firestore fetch on initial boot
+  return await fetchAndCacheServerCollection(collectionName, localFilePath, defaultValue);
+}
+
+// Background collection refresh helper
+async function triggerServerBackgroundRefresh(collectionName: string, localFilePath: string, defaultValue: any[]): Promise<void> {
+  try {
+    const colRef = collection(db, collectionName);
+    const snapshot = await getDocs(colRef);
+    if (!snapshot.empty) {
+      const firestoreItems: any[] = [];
+      snapshot.forEach((d) => {
+        const item = d.data() as any;
+        if (item) {
+          if (!item.id) {
+            item.id = d.id;
+          }
+          firestoreItems.push(item);
+        }
+      });
+
+      // Maintain sorting
+      if (collectionName === 'orders') {
+        firestoreItems.sort((a, b) => {
+          const idA = String(a.id || '');
+          const idB = String(b.id || '');
+          return idB.localeCompare(idA);
+        });
+      } else {
+        firestoreItems.sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      }
+
+      memoryCache[collectionName] = firestoreItems;
+      writeJSONFile(localFilePath, firestoreItems);
+    }
+  } catch (err) {
+    console.warn(`[Background Server Sync Warning] Failed to refresh collection ${collectionName}:`, err);
+  }
+}
+
+// Full direct fetch & seed logic
+async function fetchAndCacheServerCollection<T>(collectionName: string, localFilePath: string, defaultValue: T[]): Promise<T[]> {
   try {
     const colRef = collection(db, collectionName);
     const snapshot = await getDocs(colRef);
@@ -254,34 +314,40 @@ async function loadCollectionFromFirestore<T>(collectionName: string, localFileP
       const firestoreItems: T[] = [];
       snapshot.forEach((d) => {
         const item = d.data() as any;
-        if (item && !item.id) {
-          item.id = d.id;
+        if (item) {
+          if (!item.id) {
+            item.id = d.id;
+          }
+          firestoreItems.push(item);
         }
-        firestoreItems.push(item);
       });
 
       // Maintain sorting
       if (collectionName === 'orders') {
-        firestoreItems.sort((a: any, b: any) => {
-          const idA = String(a.id || '');
-          const idB = String(b.id || '');
+        firestoreItems.sort((a, b) => {
+          const idA = String((a as any).id || '');
+          const idB = String((b as any).id || '');
           return idB.localeCompare(idA);
         });
       } else {
-        firestoreItems.sort((a: any, b: any) => String(a.id || '').localeCompare(String(b.id || '')));
+        firestoreItems.sort((a, b) => String((a as any).id || '').localeCompare(String((b as any).id || '')));
       }
 
       memoryCache[collectionName] = firestoreItems;
       writeJSONFile(localFilePath, firestoreItems);
       return firestoreItems;
     } else {
-      // If Firestore is empty, seed from local JSON if available and sync it up
+      // Seed Firestore from local JSON if available and sync it up
       const localData = readJSONFile(localFilePath, defaultValue) as T[];
       if (Array.isArray(localData) && localData.length > 0) {
         for (const item of localData) {
           if (item) {
             const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || Math.random());
-            setDoc(doc(db, collectionName, docId), item).catch(() => {});
+            const docPayload = { ...item };
+            if (!(docPayload as any).id) {
+              (docPayload as any).id = docId;
+            }
+            setDoc(doc(db, collectionName, docId), docPayload).catch(() => {});
           }
         }
       }
@@ -290,31 +356,34 @@ async function loadCollectionFromFirestore<T>(collectionName: string, localFileP
     }
   } catch (error) {
     console.warn(`[Firestore Fetch Failed for ${collectionName}], using fallback:`, error);
+    if (!memoryCache[collectionName]) {
+      memoryCache[collectionName] = readJSONFile(localFilePath, defaultValue);
+    }
+    return memoryCache[collectionName] as T[];
   }
-
-  // Fallback to local memory / file
-  if (!memoryCache[collectionName]) {
-    memoryCache[collectionName] = readJSONFile(localFilePath, defaultValue);
-  }
-  return memoryCache[collectionName] as T[];
 }
 
 // Save or edit a doc in Firestore (non-blocking but immediately updating cache)
 async function saveDocToFirestore(collectionName: string, docId: string, data: any) {
   try {
+    const itemToSave = { ...data };
+    if (!itemToSave.id) {
+      itemToSave.id = docId;
+    }
+
     // Sync memory cache first to keep UI instant
     if (memoryCache[collectionName]) {
       const colData = memoryCache[collectionName];
       const index = colData.findIndex((item: any) => item.id === docId);
       if (index !== -1) {
-        colData[index] = { ...colData[index], ...data };
+        colData[index] = { ...colData[index], ...itemToSave };
       } else {
-        colData.push(data);
+        colData.push(itemToSave);
       }
     }
     
     // Write to Firestore and local disk
-    await setDoc(doc(db, collectionName, docId), data);
+    await setDoc(doc(db, collectionName, docId), itemToSave);
   } catch (error) {
     console.error(`[Firestore Sync-Error] Failed to write document ${docId} in ${collectionName}:`, error);
   }
@@ -337,6 +406,44 @@ async function deleteDocFromFirestore(collectionName: string, docId: string) {
 
 // Sync users collection
 async function loadUsersFromFirestore(): Promise<{ [key: string]: any }> {
+  // 1. Check inside memory cache
+  if (usersCache && Object.keys(usersCache).length > 0) {
+    triggerServerBackgroundUsersRefresh().catch(() => {});
+    return usersCache;
+  }
+
+  // 2. Check inside local json file
+  try {
+    const localUsers = readJSONFile(USERS_DB_PATH, {});
+    if (localUsers && Object.keys(localUsers).length > 0) {
+      usersCache = localUsers;
+      triggerServerBackgroundUsersRefresh().catch(() => {});
+      return localUsers;
+    }
+  } catch (_) {}
+
+  // 3. Fallback: Await direct Firestore fetch
+  return await fetchAndCacheServerUsers();
+}
+
+async function triggerServerBackgroundUsersRefresh(): Promise<void> {
+  try {
+    const colRef = collection(db, 'users');
+    const snapshot = await getDocs(colRef);
+    if (!snapshot.empty) {
+      const usersObj: { [key: string]: any } = {};
+      snapshot.forEach((d) => {
+        usersObj[d.id] = d.data();
+      });
+      usersCache = usersObj;
+      writeJSONFile(USERS_DB_PATH, usersObj);
+    }
+  } catch (err) {
+    console.warn('[Background Server Users Sync Warning] Failed to refresh users:', err);
+  }
+}
+
+async function fetchAndCacheServerUsers(): Promise<{ [key: string]: any }> {
   try {
     const colRef = collection(db, 'users');
     const snapshot = await getDocs(colRef);
@@ -352,19 +459,19 @@ async function loadUsersFromFirestore(): Promise<{ [key: string]: any }> {
       // If Firestore is empty, seed from local JSON
       const localUsers = readJSONFile(USERS_DB_PATH, {});
       for (const phone in localUsers) {
-        setDoc(doc(db, 'users', phone), localUsers[phone]).catch(() => {});
+        const docPayload = { ...localUsers[phone] };
+        setDoc(doc(db, 'users', phone), docPayload).catch(() => {});
       }
       usersCache = localUsers;
       return localUsers;
     }
   } catch (error) {
     console.warn('[Firestore loadUsers failed], using local fallback:', error);
+    if (!usersCache) {
+      usersCache = readJSONFile(USERS_DB_PATH, {});
+    }
+    return usersCache;
   }
-
-  if (!usersCache) {
-    usersCache = readJSONFile(USERS_DB_PATH, {});
-  }
-  return usersCache;
 }
 
 async function saveUserToFirestore(phone: string, userObj: any) {
