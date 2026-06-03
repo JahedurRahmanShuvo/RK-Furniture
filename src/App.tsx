@@ -91,7 +91,14 @@ export default function App() {
   const [user, setUser] = useState<UserProfile>(() => {
     try {
       const saved = localStorage.getItem('rk_user');
-      return saved ? JSON.parse(saved) : { name: '', phone: '', email: '', isLoggedIn: false };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.email === 'shuvojahedurrahman15@gmail.com') {
+          parsed.email = '';
+        }
+        return parsed;
+      }
+      return { name: '', phone: '', email: '', isLoggedIn: false };
     } catch (e) {
       console.warn('Storage read failed:', e);
       return { name: '', phone: '', email: '', isLoggedIn: false };
@@ -433,8 +440,14 @@ export default function App() {
   useEffect(() => {
     if (user.isLoggedIn) {
       setEditName(user.name);
-      setEditEmail(user.email);
+      
+      const emailValue = user.email === 'shuvojahedurrahman15@gmail.com' ? '' : (user.email || '');
+      setEditEmail(emailValue);
       setEditPhone(user.phone);
+      
+      if (user.email === 'shuvojahedurrahman15@gmail.com') {
+        setUser(prev => ({ ...prev, email: '' }));
+      }
     }
   }, [user]);
 
@@ -866,10 +879,11 @@ export default function App() {
       }
     }
 
+    const loginEmailSanitized = registered.email === 'shuvojahedurrahman15@gmail.com' ? '' : (registered.email || '');
     setUser({
       name: registered.name,
       phone: loginPhone,
-      email: registered.email || '',
+      email: loginEmailSanitized,
       isLoggedIn: true
     });
     setAuthError('');
@@ -884,8 +898,12 @@ export default function App() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signupName || !signupPhone || !signupPassword || !signupConfirmPassword) {
-      setAuthError('Please fill in all asterisks (*) fields');
+    if (!signupName || !signupPhone || !signupEmail || !signupPassword || !signupConfirmPassword) {
+      setAuthError('Please fill in all fields (Name, Phone, Email, and Password).');
+      return;
+    }
+    if (signupEmail.trim().toLowerCase() === 'shuvojahedurrahman15@gmail.com') {
+      setAuthError('This email address is not allowed for customer registration.');
       return;
     }
     if (signupPhone === '01700000000') {
@@ -902,7 +920,7 @@ export default function App() {
     }
 
     // Connect to Firebase Authentication
-    const targetEmail = signupEmail || `${signupPhone}@rkfurniture.com`;
+    const targetEmail = signupEmail;
     try {
       const userCred = await createUserWithEmailAndPassword(auth, targetEmail, signupPassword);
       if (userCred.user) {
@@ -920,7 +938,7 @@ export default function App() {
     
     const userObj = { 
       name: signupName, 
-      email: signupEmail || '',
+      email: signupEmail,
       password: signupPassword
     };
 
@@ -940,7 +958,7 @@ export default function App() {
     setUser({
       name: signupName,
       phone: signupPhone,
-      email: signupEmail || '',
+      email: signupEmail,
       isLoggedIn: true
     });
     setAuthError('');
@@ -2678,9 +2696,10 @@ export default function App() {
 
                     {/* Email */}
                     <div className="space-y-1.5 text-xs text-left">
-                      <label className="font-bold text-slate-400 block">Email (Optional)</label>
+                      <label className="font-bold text-slate-600 block">Email Address *</label>
                       <input
                         type="email"
+                        required
                         placeholder="Email Address"
                         value={signupEmail}
                         onChange={(e) => setSignupEmail(e.target.value)}
@@ -3135,6 +3154,10 @@ export default function App() {
                           e.preventDefault();
                           if (!editName || !editPhone) {
                             setEditProfileMessage('Full Name and Phone are required.');
+                            return;
+                          }
+                          if (editEmail.trim().toLowerCase() === 'shuvojahedurrahman15@gmail.com') {
+                            setEditProfileMessage('This email address is not permitted for your security.');
                             return;
                           }
                           
