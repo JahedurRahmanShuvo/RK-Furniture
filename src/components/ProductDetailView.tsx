@@ -108,7 +108,7 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Specifications / Notes</h4>
             {prod.description && (prod.description.includes('<') || prod.description.includes('&')) ? (
               <div 
-                className="text-xs text-slate-600 leading-relaxed font-sans prose max-w-none prose-slate"
+                className="text-xs text-slate-600 leading-relaxed font-sans prose editor-content max-w-none prose-slate"
                 dangerouslySetInnerHTML={{ __html: prod.description }}
               />
             ) : (

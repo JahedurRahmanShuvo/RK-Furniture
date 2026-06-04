@@ -17,3 +17,24 @@ body {
   font-family: "Anek Bangla", sans-serif !important;
 }
 
+/* Enable Ordered/Unordered Lists styling within the editor and detail view */
+.editor-content ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.editor-content ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.editor-content li {
+  margin-bottom: 0.25rem !important;
+  display: list-item !important;
+}
+
+

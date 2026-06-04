@@ -364,7 +364,7 @@ export default function ProductDescriptionEditor({
               <div
                 ref={editorRef}
                 onInput={handleInput}
-                className="w-full min-h-[140px] p-4 text-[16px] text-[#202124] focus:outline-none overflow-y-auto prose max-w-none prose-slate prose-sm leading-relaxed"
+                className="w-full min-h-[140px] p-4 text-[16px] text-[#202124] focus:outline-none overflow-y-auto prose editor-content max-w-none prose-slate prose-sm leading-relaxed"
                 contentEditable
                 style={{ minHeight: '140px' }}
               />

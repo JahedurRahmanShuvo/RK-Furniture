@@ -2785,7 +2785,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
                 >
                   {prodDesc ? (
                     <div 
-                      className="prose prose-sm max-w-none text-slate-700 leading-relaxed"
+                      className="prose editor-content prose-sm max-w-none text-slate-700 leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: prodDesc }}
                     />
                   ) : (
