@@ -2,12 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- GLOBAL SAFETY NET ---
+    // 1. GLOBAL SAFETY NET - DENY BY DEFAULT
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- REUSABLE SECURITY PRIMITIVES ---
+    // 2. REUSABLE SECURITY PRIMITIVES
     function isSignedIn() {
       return request.auth != null;
     }
@@ -19,75 +19,163 @@ service cloud.firestore {
       );
     }
 
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // 3. SCHEMA VALIDATION BLUEPRINTS (ANTI-UPDATE-GAP)
+    function isValidProduct(data) {
+      return data.id is string
+        && data.name is string && data.name.size() <= 200
+        && data.price is number
+        && data.image is string
+        && data.category is string;
+    }
+
+    function isValidOrder(data) {
+      return data.id is string
+        && data.orderNumber is string
+        && data.customerName is string && data.customerName.size() <= 100
+        && data.customerMobile is string
+        && data.deliveryAddress is string && data.deliveryAddress.size() <= 500
+        && data.total is number
+        && data.status is string;
+    }
+
+    function isValidCategory(data) {
+      return data.id is string
+        && data.name is string && data.name.size() <= 100;
+    }
+
+    function isValidSlide(data) {
+      return data.id is string
+        && data.title is string && data.title.size() <= 200
+        && data.bg is string;
+    }
+
+    function isValidShippingArea(data) {
+      return data.id is string
+        && data.name is string && data.name.size() <= 100
+        && data.charge is number;
+    }
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() <= 100
+        && data.email is string;
+    }
+
+    function isValidStoreContact(data) {
+      return data.id is string
+        && data.phone is string
+        && data.whatsappUrl is string;
+    }
+
+    function isValidCoupon(data) {
+      return data.id is string
+        && data.code is string
+        && data.discountPercent is number
+        && data.isActive is bool;
+    }
+
+    function isValidSession(data) {
+      return data.sessionId is string
+        && data.deviceName is string
+        && data.isAdmin is bool
+        && data.lastSeen is number;
+    }
+
+    // 4. COLLECTION MATCH BLOCKS
+
     // --- PRODUCTS COLLECTION ---
     match /products/{productId} {
-      allow read: if true; // Public catalog access
-      allow write: if isAdmin(); // Admin restricted write access
+      allow read: if true; // Public access to view catalog
+      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
+      allow update: if isAdmin() && isValidProduct(incoming());
+      allow delete: if isAdmin();
     }
 
     // --- CATEGORIES COLLECTION ---
     match /categories/{categoryId} {
-      allow read: if true; // Public catalog access
-      allow write: if isAdmin(); // Admin restricted write access
+      allow read: if true; // Public e-commerce product navigation
+      allow create: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming());
+      allow update: if isAdmin() && isValidCategory(incoming());
+      allow delete: if isAdmin();
     }
 
-    // --- SLIDES (PROMO BANNERS) COLLECTION ---
+    // --- CAROUSEL SLIDES COLLECTION ---
     match /slides/{slideId} {
-      allow read: if true; // Public slide banner viewing
-      allow write: if isAdmin(); // Admin restricted write access
+      allow read: if true; // Public promo viewing
+      allow create: if isAdmin() && isValidId(slideId) && isValidSlide(incoming());
+      allow update: if isAdmin() && isValidSlide(incoming());
+      allow delete: if isAdmin();
     }
 
     // --- SHIPPING AREAS COLLECTION ---
     match /shipping_areas/{areaId} {
-      allow read: if true; // Public shipping pricing visibility
-      allow write: if isAdmin(); // Admin restricted write access
-    }
-
-    // --- STORE CONTACT (CHAT HELP DESK) COLLECTION ---
-    match /store_contact/{contactId} {
-      allow read: if true; // Public support details viewing
-      allow write: if isAdmin(); // Admin restricted write access
-    }
-
-    // --- SHOP POLICIES COLLECTION ---
-    match /shop_policies/{policyId} {
-      allow read: if true; // Public terms/privacy policies visibility
-      allow write: if isAdmin(); // Admin restricted write access
-    }
-
-    // --- COUPONS COLLECTION ---
-    match /coupons/{couponId} {
-      allow read: if true; // Public coupons check
-      allow write: if isAdmin(); // Admin restricted write access
-    }
-
-    // --- SESSIONS (VIEWERS / VISITOR SESSIONS) COLLECTION ---
-    match /sessions/{sessionId} {
-      // Allows active heartbeat registration for real-time monitoring of online visitors
-      allow read: if true;
-      allow create, update: if true;
+      allow read: if true; // Public shipping cost computation
+      allow create: if isAdmin() && isValidId(areaId) && isValidShippingArea(incoming());
+      allow update: if isAdmin() && isValidShippingArea(incoming());
       allow delete: if isAdmin();
     }
 
-    // --- SYSTEM METADATA COLLECTION ---
+    // --- STORE LIVE CONTACT (SUPPORT) COLLECTION ---
+    match /store_contact/{contactId} {
+      allow read: if true; // Public instant message / support info
+      allow create: if isAdmin() && isValidId(contactId) && isValidStoreContact(incoming());
+      allow update: if isAdmin() && isValidStoreContact(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // --- SHOP TERMS & LEGAL POLICIES COLLECTION ---
+    match /shop_policies/{policyId} {
+      allow read: if true; // Public policy pages
+      allow create: if isAdmin() && isValidId(policyId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- COUPONS COLLECTION (PROMOS) ---
+    match /coupons/{couponId} {
+      allow read: if true; // Public discount validation
+      allow create: if isAdmin() && isValidId(couponId) && isValidCoupon(incoming());
+      allow update: if isAdmin() && isValidCoupon(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // --- REALTIME ACTIVE SESSIONS ---
+    match /sessions/{sessionId} {
+      allow read: if true; // Allow active heartbeats to keep visitors synced
+      allow create: if isValidId(sessionId) && isValidSession(incoming());
+      allow update: if isValidSession(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // --- SYSTEM METADATA ---
     match /system_meta/{metaId} {
       allow read, write: if true;
     }
 
-    // --- USERS PROFILE COLLECTION ---
+    // --- USERS ACCOUNT REGISTRY ---
     match /users/{phone} {
-      // Allow read so that guest visitors during login/registration/forgot password can verify existences
-      allow read: if true;
-      allow create, update: if isAdmin() || true;
+      allow read: if true; // Verification of user existences
+      allow create: if isValidUser(incoming());
+      allow update: if isAdmin() || (isSignedIn() && isValidUser(incoming()));
       allow delete: if isAdmin();
     }
 
-    // --- ORDERS COLLECTION ---
+    // --- ORDERS TRACK DECK ---
     match /orders/{orderId} {
-      // Allows customers to place orders (guest and registered checkouts), and track order status
-      allow read: if true;
-      allow create: if true;
-      allow update: if isAdmin() || true;
+      allow read: if true; // Tracking individual order tracking code status
+      allow create: if isValidId(orderId) && isValidOrder(incoming());
+      allow update: if isAdmin() || isValidOrder(incoming());
       allow delete: if isAdmin();
     }
   }
