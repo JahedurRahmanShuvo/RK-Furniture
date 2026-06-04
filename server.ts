@@ -72,12 +72,28 @@ async function ensureBackendSignedIn() {
       await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
       console.log('[Firebase Backend Auth] Server successfully authenticated as admin@rkfurniture.com');
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('invalid-credential') || err.message?.includes('user-not-found')) {
+      if (err.code === 'auth/operation-not-allowed') {
+        console.error(
+          '\n\x1b[31m[PROACTIVE WARNING] Firebase Auth error: Email/Password login is not enabled in Firebase!\x1b[0m\n' +
+          'To fix this and allow the administration synchronization backend, user signups, and logistics logs to run correctly:\n' +
+          '1. Go to Firebase Console: https://console.firebase.google.com/\n' +
+          '2. Open your project: "rk-furniture-e0b7e" (or your active database project)\n' +
+          '3. Navigate to "Authentication" -> "Sign-in method"\n' +
+          '4. Click "Add new provider" (or Edit), select "Email/Password", and click "Enable", then Save.\n'
+        );
+      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('invalid-credential') || err.message?.includes('user-not-found')) {
         try {
           await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
           console.log('[Firebase Backend Auth] Created new admin credentials on Firestore & signed in');
-        } catch (createErr) {
-          console.error('[Firebase Backend Auth] Failed to create a new admin user:', createErr);
+        } catch (createErr: any) {
+          if (createErr.code === 'auth/operation-not-allowed') {
+            console.error(
+              '\n\x1b[31m[PROACTIVE WARNING] Firebase Auth registration failed: Email/Password login is not enabled in Firebase!\x1b[0m\n' +
+              'Action required: Please enable the "Email/Password" sign-in provider in your Firebase Authentication Console under the Sign-in Method tab.\n'
+            );
+          } else {
+            console.error('[Firebase Backend Auth] Failed to create a new admin user:', createErr);
+          }
         }
       } else {
         console.error('[Firebase Backend Auth] Auth error signing in server as admin:', err);
@@ -86,6 +102,53 @@ async function ensureBackendSignedIn() {
   } catch (outerErr) {
     console.error('[Firebase Backend Auth] Critical setup error:', outerErr);
   }
+}
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 }
 
 // JSON Local Persistence DB Paths
@@ -518,8 +581,15 @@ async function saveUserToFirestore(phone: string, userObj: any) {
       usersCache[phone] = userObj;
     }
     await setDoc(doc(db, 'users', phone), userObj);
-  } catch (error) {
+  } catch (error: any) {
     console.error(`[Firestore Sync Error] Failed to write user userObj:`, error);
+    if (error && (error.code === 'permission-denied' || String(error).includes('permission') || String(error).includes('PERMISSION_DENIED'))) {
+      try {
+        handleFirestoreError(error, OperationType.WRITE, `users/${phone}`);
+      } catch (_) {
+        // Prevent background uncaught promise crash
+      }
+    }
   }
 }
 
