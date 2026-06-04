@@ -45,16 +45,9 @@ const defaultFirebaseConfig = {
   measurementId: "G-7V079KPE44"
 };
 
-const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+// Force server to connect exclusively to the production rk-furniture-e0b7e project for perfect synchronization
 let firebaseConfig: any = defaultFirebaseConfig;
-if (fs.existsSync(configPath)) {
-  try {
-    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    console.log('[Firebase config loaded from platform]', firebaseConfig.projectId);
-  } catch (error) {
-    console.error('Failed to parse firebase-applet-config.json:', error);
-  }
-}
+console.log('[Firebase config forced to production]', firebaseConfig.projectId);
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = firebaseConfig.firestoreDatabaseId 
