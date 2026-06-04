@@ -28,7 +28,7 @@ export default function Navbar({
           className="flex items-center gap-1.5 focus:outline-none cursor-pointer"
         >
           <img
-            src="/logo.png"
+            src="https://i.postimg.cc/63KXZNcz/20260530-101216.png"
             alt="RK Furniture Logo"
             className="h-10 sm:h-12 w-auto object-contain"
             referrerPolicy="no-referrer"
