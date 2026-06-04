@@ -185,6 +185,7 @@ export default function App() {
   });
 
   const [appLoading, setAppLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [activeFooterPolicy, setActiveFooterPolicy] = useState<string | null>(null);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [promoDiscountPercent, setPromoDiscountPercent] = useState<number>(0);
@@ -199,9 +200,13 @@ export default function App() {
       .then((data) => {
         if (Array.isArray(data)) {
           setProducts(data);
+          setProductsLoading(false);
         }
       })
-      .catch((err) => console.error('Failed to sync products from server:', err));
+      .catch((err) => {
+        console.error('Failed to sync products from server:', err);
+        setProductsLoading(false);
+      });
 
     fetch('/api/slides')
       .then((res) => res.json())
@@ -300,7 +305,12 @@ export default function App() {
               .then((data) => {
                 if (Array.isArray(data)) {
                   setProducts(data);
+                  setProductsLoading(false);
                 }
+              })
+              .catch((err) => {
+                console.error('Failed to fetch initial products:', err);
+                setProductsLoading(false);
               }),
             fetch('/api/slides')
               .then((res) => res.json())
@@ -1703,107 +1713,113 @@ export default function App() {
 
                 {/* Products Cards Grid Layout */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {products
-                    .filter((p) => !selectedCategory || p.category === selectedCategory)
-                    .map((prod) => {
-                    const inWish = wishlist.includes(prod.id);
-                    const { discountPercent } = getProductPrices(prod);
-                    return (
-                      <motion.div
-                        key={prod.id}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-2xl overflow-hidden border border-slate-100/50 shadow-sm hover:shadow transition-all relative flex flex-col"
-                      >
-                        {/* Wishlist toggle absolute button */}
-                        <button
-                          onClick={(e) => toggleWishlist(prod.id, e)}
-                          className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-white/90 backdrop-blur border border-slate-50 shadow-sm z-10 text-slate-400 hover:text-red-500 transition-colors"
+                  {products.filter((p) => !selectedCategory || p.category === selectedCategory).length === 0 ? (
+                    <div className="col-span-full py-12 text-center text-slate-400 font-sans italic">
+                      No products found in this category.
+                    </div>
+                  ) : (
+                    products
+                      .filter((p) => !selectedCategory || p.category === selectedCategory)
+                      .map((prod) => {
+                      const inWish = wishlist.includes(prod.id);
+                      const { discountPercent } = getProductPrices(prod);
+                      return (
+                        <motion.div
+                          key={prod.id}
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-white rounded-2xl overflow-hidden border border-slate-100/50 shadow-sm hover:shadow transition-all relative flex flex-col"
                         >
-                          <Heart className={`w-4 h-4 ${inWish ? 'fill-red-500 text-red-500' : ''}`} />
-                        </button>
+                          {/* Wishlist toggle absolute button */}
+                          <button
+                            onClick={(e) => toggleWishlist(prod.id, e)}
+                            className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-white/90 backdrop-blur border border-slate-50 shadow-sm z-10 text-slate-400 hover:text-red-500 transition-colors"
+                          >
+                            <Heart className={`w-4 h-4 ${inWish ? 'fill-red-500 text-red-500' : ''}`} />
+                          </button>
 
-                        {/* Cover Image/Vector Display */}
-                        <div
-                          onClick={() => {
-                            setSelectedProductId(prod.id);
-                            setView('product_detail');
-                          }}
-                          className="h-32 sm:h-44 bg-slate-50 relative flex items-center justify-center overflow-hidden cursor-pointer group"
-                        >
-                          {prod.image === 'placeholder_box' ? (
-                            <div className="duration-300 group-hover:scale-105 p-6 animate-pulse">
-                              <BoxWithRays className="w-18 h-18 sm:w-24 sm:h-24 text-slate-800" />
-                            </div>
-                          ) : (
-                            <img
-                              src={prod.image}
-                              alt={prod.name}
-                              className="w-full h-full object-cover group-hover:scale-105 duration-300"
-                              referrerPolicy="no-referrer"
-                            />
-                          )}
-                          {discountPercent && discountPercent > 0 ? (
-                            <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
-                              SAVE {discountPercent}%
-                            </div>
-                          ) : null}
-                        </div>
-
-                        {/* Content details block */}
-                        <div className="p-3.5 flex-1 flex flex-col justify-between space-y-3">
+                          {/* Cover Image/Vector Display */}
                           <div
                             onClick={() => {
                               setSelectedProductId(prod.id);
                               setView('product_detail');
                             }}
-                            className="cursor-pointer space-y-0.5 block text-left"
+                            className="h-32 sm:h-44 bg-slate-50 relative flex items-center justify-center overflow-hidden cursor-pointer group"
                           >
-                            <h4 className="font-bold text-slate-800 tracking-tight hover:text-green-700 font-sans text-sm sm:text-base leading-tight">
-                              {prod.name}
-                            </h4>
+                            {prod.image === 'placeholder_box' ? (
+                              <div className="duration-300 group-hover:scale-105 p-6 animate-pulse">
+                                <BoxWithRays className="w-18 h-18 sm:w-24 sm:h-24 text-slate-800" />
+                              </div>
+                            ) : (
+                              <img
+                                src={prod.image}
+                                alt={prod.name}
+                                className="w-full h-full object-cover group-hover:scale-105 duration-300"
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                            {discountPercent && discountPercent > 0 ? (
+                              <div className="absolute bottom-2 left-2 bg-white text-slate-800 text-[10px] font-extrabold px-2 py-1 rounded shadow-sm z-10 font-sans tracking-wide">
+                                SAVE {discountPercent}%
+                              </div>
+                            ) : null}
                           </div>
 
-                          {/* Price & action stack */}
-                          <div className="space-y-2 text-left">
-                            {(() => {
-                              const { currentPrice, oldPrice } = getProductPrices(prod);
-                              return (
-                                <div className="flex items-center gap-2 flex-wrap text-left font-mono">
-                                  <span className="text-[#c25927] font-bold text-xs sm:text-sm">
-                                    {currentPrice.toLocaleString()} AED
-                                  </span>
-                                  {oldPrice && (
-                                    <span className="text-slate-400 font-bold line-through text-[10px] sm:text-xs">
-                                      {oldPrice.toLocaleString()} AED
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })()}
+                          {/* Content details block */}
+                          <div className="p-3.5 flex-1 flex flex-col justify-between space-y-3">
+                            <div
+                              onClick={() => {
+                                setSelectedProductId(prod.id);
+                                setView('product_detail');
+                              }}
+                              className="cursor-pointer space-y-0.5 block text-left"
+                            >
+                              <h4 className="font-bold text-slate-800 tracking-tight hover:text-green-700 font-sans text-sm sm:text-base leading-tight">
+                                {prod.name}
+                              </h4>
+                            </div>
 
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <button
-                                onClick={() => addToCart(prod.id, 1)}
-                                className="text-[10px] sm:text-xs font-semibold py-1.5 px-2 text-center rounded border border-[#15803d]/40 text-[#15803d] hover:bg-[#15803d]/5 active:scale-95 transition-all cursor-pointer"
-                              >
-                                Add to Cart
-                              </button>
-                              <button
-                                onClick={() => {
-                                  addToCart(prod.id, 1);
-                                  setView('checkout');
-                                }}
-                                className="text-[10px] sm:text-xs font-semibold py-1.5 px-2 text-center rounded bg-[#15803d] hover:bg-emerald-800 text-white active:scale-95 transition-all shadow-sm cursor-pointer"
-                              >
-                                Buy Now
-                              </button>
+                            {/* Price & action stack */}
+                            <div className="space-y-2 text-left">
+                              {(() => {
+                                const { currentPrice, oldPrice } = getProductPrices(prod);
+                                return (
+                                  <div className="flex items-center gap-2 flex-wrap text-left font-mono">
+                                    <span className="text-[#c25927] font-bold text-xs sm:text-sm">
+                                      {currentPrice.toLocaleString()} AED
+                                    </span>
+                                    {oldPrice && (
+                                      <span className="text-slate-400 font-bold line-through text-[10px] sm:text-xs">
+                                        {oldPrice.toLocaleString()} AED
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  onClick={() => addToCart(prod.id, 1)}
+                                  className="text-[10px] sm:text-xs font-semibold py-1.5 px-2 text-center rounded border border-[#15803d]/40 text-[#15803d] hover:bg-[#15803d]/5 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  Add to Cart
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    addToCart(prod.id, 1);
+                                    setView('checkout');
+                                  }}
+                                  className="text-[10px] sm:text-xs font-semibold py-1.5 px-2 text-center rounded bg-[#15803d] hover:bg-emerald-800 text-white active:scale-95 transition-all shadow-sm cursor-pointer"
+                                >
+                                  Buy Now
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                        </motion.div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
