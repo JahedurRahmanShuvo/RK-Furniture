@@ -292,71 +292,74 @@ export default function App() {
         const currentPhone = parsedUser && parsedUser.isLoggedIn && parsedUser.phone ? parsedUser.phone : '';
         const phoneParam = `?phone=${currentPhone}`;
 
-        // Fetch products, slides, and categories in parallel first to block loading screen until everything arrives
-        await Promise.allSettled([
-          fetch('/api/products')
-            .then((res) => res.json())
-            .then((data) => {
-              if (Array.isArray(data)) {
-                setProducts(data);
-              }
-            }),
-          fetch('/api/slides')
-            .then((res) => res.json())
-            .then((data) => {
-              if (Array.isArray(data)) {
-                setSlides(data);
-              }
-            }),
-          fetch('/api/categories')
-            .then((res) => res.json())
-            .then((data) => {
-              if (Array.isArray(data)) {
-                setCategories(data);
-              }
-            }),
-          fetch('/api/shipping-areas')
-            .then((res) => res.json())
-            .then((data) => {
-              if (Array.isArray(data) && data.length > 0) {
-                setShippingAreas(data);
-                setCheckoutArea((prev) => prev || data[0].id);
-              }
-            }),
-          fetch('/api/store-contact')
-            .then((res) => res.json())
-            .then((data) => {
-              if (data && data.phone) {
-                setStoreContact(data);
-              }
-            }),
-          fetch('/api/coupons')
-            .then((res) => res.json())
-            .then((data) => {
-              if (Array.isArray(data)) {
-                setCoupons(data);
-              }
-            }),
-          fetch('/api/orders' + phoneParam)
-            .then((res) => res.json())
-            .then((data) => {
-              if (Array.isArray(data)) {
-                setOrders(data);
-              }
-            }),
-          fetch('/api/users' + phoneParam)
-            .then((res) => res.json())
-            .then((data) => {
-              if (data && typeof data === 'object') {
-                setRegisteredUsers(data);
-                if (currentPhone && data[currentPhone]) {
-                  const registered = data[currentPhone];
-                  if (Array.isArray(registered.addresses)) {
-                    setAddresses(registered.addresses);
+        // Fetch products, slides, and categories in parallel first. Wrap in a Promise.race with a 2.5-second timeout to prevent slow loading
+        await Promise.race([
+          Promise.allSettled([
+            fetch('/api/products')
+              .then((res) => res.json())
+              .then((data) => {
+                if (Array.isArray(data)) {
+                  setProducts(data);
+                }
+              }),
+            fetch('/api/slides')
+              .then((res) => res.json())
+              .then((data) => {
+                if (Array.isArray(data)) {
+                  setSlides(data);
+                }
+              }),
+            fetch('/api/categories')
+              .then((res) => res.json())
+              .then((data) => {
+                if (Array.isArray(data)) {
+                  setCategories(data);
+                }
+              }),
+            fetch('/api/shipping-areas')
+              .then((res) => res.json())
+              .then((data) => {
+                if (Array.isArray(data) && data.length > 0) {
+                  setShippingAreas(data);
+                  setCheckoutArea((prev) => prev || data[0].id);
+                }
+              }),
+            fetch('/api/store-contact')
+              .then((res) => res.json())
+              .then((data) => {
+                if (data && data.phone) {
+                  setStoreContact(data);
+                }
+              }),
+            fetch('/api/coupons')
+              .then((res) => res.json())
+              .then((data) => {
+                if (Array.isArray(data)) {
+                  setCoupons(data);
+                }
+              }),
+            fetch('/api/orders' + phoneParam)
+              .then((res) => res.json())
+              .then((data) => {
+                if (Array.isArray(data)) {
+                  setOrders(data);
+                }
+              }),
+            fetch('/api/users' + phoneParam)
+              .then((res) => res.json())
+              .then((data) => {
+                if (data && typeof data === 'object') {
+                  setRegisteredUsers(data);
+                  if (currentPhone && data[currentPhone]) {
+                    const registered = data[currentPhone];
+                    if (Array.isArray(registered.addresses)) {
+                      setAddresses(registered.addresses);
+                    }
                   }
                 }
-              }
-            })
+              })
+          ]),
+          new Promise((resolve) => setTimeout(resolve, 2500))
         ]);
       } catch (err) {
         console.error('Error during initial sync:', err);

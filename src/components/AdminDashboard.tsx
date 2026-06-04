@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Product, Order, OrderStatus } from '../types';
 import OrderReceipt from './OrderReceipt';
+import ProductDescriptionEditor from './ProductDescriptionEditor';
 
 interface AdminDashboardProps {
   user: { name: string; phone: string; isLoggedIn: boolean };
@@ -91,6 +92,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [prodImages, setProdImages] = useState<string[]>(['', '', '', '']);
   const [prodDiscountPercent, setProdDiscountPercent] = useState<number>(0);
   const [prodIsTrending, setProdIsTrending] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
 
   // Coupon configuration forms
   const [couponsList, setCouponsList] = useState<any[]>([]);
@@ -164,8 +166,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
   // Load backend statistics
   const fetchAllData = () => {
-    // 1. Fetch Orders from Express persistent server
-    fetch('/api/orders')
+    // 1. Fetch Orders from Express persistent server with admin authorization
+    fetch('/api/orders?phone=' + (user?.phone || '01700000000'))
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -266,7 +268,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     const loadInitialSystems = async () => {
       try {
         await Promise.allSettled([
-          fetch('/api/orders').then((res) => res.json()).then((data) => {
+          fetch('/api/orders?phone=' + (user?.phone || '01700000000')).then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setOrders(data);
           }),
           fetch('/api/products').then((res) => res.json()).then((data) => {
@@ -2776,14 +2778,32 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-505 block">Catalog Description *</label>
-                <textarea 
-                  rows={2} 
+                <label className="font-bold text-slate-700 block text-xs uppercase tracking-wider">Catalog Description *</label>
+                <div 
+                  onClick={() => setIsEditingDescription(true)}
+                  className="w-full min-h-[90px] bg-white border border-slate-200 rounded p-3 text-slate-800 text-xs outline-none cursor-pointer hover:border-amber-500 transition leading-relaxed overflow-y-auto select-none"
+                >
+                  {prodDesc ? (
+                    <div 
+                      className="prose prose-sm max-w-none text-slate-700 leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: prodDesc }}
+                    />
+                  ) : (
+                    <span className="text-slate-400 italic">Tell clients about materials, finishes, craftsmanship...</span>
+                  )}
+                </div>
+
+                <input 
+                  type="hidden" 
                   required 
-                  placeholder="Tell clients about materials, finishes, craftsmanship..."
                   value={prodDesc}
-                  onChange={(e) => setProdDesc(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded p-2 text-slate-800 outline-none resize-none focus:border-amber-500"
+                />
+
+                <ProductDescriptionEditor
+                  isOpen={isEditingDescription}
+                  onClose={() => setIsEditingDescription(false)}
+                  initialValue={prodDesc}
+                  onSave={(val) => setProdDesc(val)}
                 />
               </div>
 

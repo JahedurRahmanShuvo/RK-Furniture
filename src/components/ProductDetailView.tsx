@@ -105,10 +105,17 @@ export default function ProductDetailView({ prod, onBack, addToCart, setView }: 
           </div>
 
           <div className="border-t border-slate-100 pt-3 space-y-2">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Specifications/Notes</h4>
-            <p className="text-xs text-slate-600 leading-relaxed font-sans">
-              {prod.description || 'No description available'}
-            </p>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Specifications / Notes</h4>
+            {prod.description && (prod.description.includes('<') || prod.description.includes('&')) ? (
+              <div 
+                className="text-xs text-slate-600 leading-relaxed font-sans prose max-w-none prose-slate"
+                dangerouslySetInnerHTML={{ __html: prod.description }}
+              />
+            ) : (
+              <p className="text-xs text-slate-600 leading-relaxed font-sans pre-wrap whitespace-pre-wrap">
+                {prod.description || 'No description available'}
+              </p>
+            )}
           </div>
 
           {/* Quantities manager and action stack */}

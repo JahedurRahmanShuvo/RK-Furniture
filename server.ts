@@ -11,6 +11,11 @@ import {
   doc, 
   deleteDoc 
 } from 'firebase/firestore';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from 'firebase/auth';
 import compression from 'compression';
 
 const app = express();
@@ -55,6 +60,33 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = firebaseConfig.firestoreDatabaseId 
   ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
   : getFirestore(firebaseApp);
+
+const auth = getAuth(firebaseApp);
+
+async function ensureBackendSignedIn() {
+  if (auth.currentUser) return;
+  try {
+    const adminEmail = 'admin@rkfurniture.com';
+    const adminPassword = 'rkfurniture0123';
+    try {
+      await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+      console.log('[Firebase Backend Auth] Server successfully authenticated as admin@rkfurniture.com');
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials' || err.message?.includes('invalid-credential') || err.message?.includes('user-not-found')) {
+        try {
+          await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
+          console.log('[Firebase Backend Auth] Created new admin credentials on Firestore & signed in');
+        } catch (createErr) {
+          console.error('[Firebase Backend Auth] Failed to create a new admin user:', createErr);
+        }
+      } else {
+        console.error('[Firebase Backend Auth] Auth error signing in server as admin:', err);
+      }
+    }
+  } catch (outerErr) {
+    console.error('[Firebase Backend Auth] Critical setup error:', outerErr);
+  }
+}
 
 // JSON Local Persistence DB Paths
 const PRODUCTS_DB_PATH = path.join(process.cwd(), 'db_products.json');
@@ -382,6 +414,9 @@ async function saveDocToFirestore(collectionName: string, docId: string, data: a
       }
     }
     
+    // Ensure the server has administrative credentials
+    await ensureBackendSignedIn();
+
     // Write to Firestore and local disk
     await setDoc(doc(db, collectionName, docId), itemToSave);
   } catch (error) {
@@ -397,6 +432,9 @@ async function deleteDocFromFirestore(collectionName: string, docId: string) {
       memoryCache[collectionName] = memoryCache[collectionName].filter((item: any) => item.id !== docId);
     }
     
+    // Ensure the server has administrative credentials
+    await ensureBackendSignedIn();
+
     // Delete from Firestore
     await deleteDoc(doc(db, collectionName, docId));
   } catch (error) {
@@ -1072,6 +1110,11 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Trigger background Firebase authentication for administrative privileges
+  ensureBackendSignedIn().catch((err) => {
+    console.warn('[Firebase Backend Auth Startup Failed]:', err);
+  });
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
