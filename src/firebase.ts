@@ -2,22 +2,27 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
+import appletConfig from "../firebase-applet-config.json";
 
-// Configured from user-provided Firebase parameters
+// Dynamic configuration matching active platform environment
 export const firebaseConfig = {
-  apiKey: "AIzaSyDfuSipIqlV69-bzFg24F52DLf6GR7PYwQ",
-  authDomain: "rk-furniture-e0b7e.firebaseapp.com",
-  projectId: "rk-furniture-e0b7e",
-  storageBucket: "rk-furniture-e0b7e.firebasestorage.app",
-  messagingSenderId: "396188287069",
-  appId: "1:396188287069:web:bb1150bb693cd6b72c8db4",
-  measurementId: "G-7V079KPE44"
+  apiKey: appletConfig.apiKey || "AIzaSyDBS2NnE8tEgzsRFBJXHpQchG_2b203iYo",
+  authDomain: appletConfig.authDomain || "double-proposal-ck9gj.firebaseapp.com",
+  projectId: appletConfig.projectId || "double-proposal-ck9gj",
+  storageBucket: appletConfig.storageBucket || "double-proposal-ck9gj.firebasestorage.app",
+  messagingSenderId: appletConfig.messagingSenderId || "764747904352",
+  appId: appletConfig.appId || "1:764747904352:web:19abf4cc46ac3c9bf0da05",
+  measurementId: appletConfig.measurementId || ""
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Use the explicit Firestore Database ID from configuration
+export const db = appletConfig.firestoreDatabaseId 
+  ? getFirestore(app, appletConfig.firestoreDatabaseId)
+  : getFirestore(app);
 
 // Safe initialization of Analytics only in browser environment
 if (typeof window !== "undefined") {
@@ -27,3 +32,4 @@ if (typeof window !== "undefined") {
     }
   });
 }
+

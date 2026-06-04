@@ -293,21 +293,25 @@ async function fetchAndCacheFirestoreCollection<T>(collectionName: string, defau
       } catch (_) {}
       return items;
     } else {
-      // Seed Firestore with default value only if the DB has NEVER been seeded
-      const seedRef = doc(db, 'system_meta', 'seed_status');
+      // Seed Firestore with default value if the collection is empty
+      const seedRef = doc(db, 'system_meta', 'seed_status_' + collectionName);
       const seedSnap = await getDoc(seedRef);
       const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
 
-      if (!isSeeded && defaultValue.length > 0) {
-        for (const item of defaultValue) {
-          const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
-          const docPayload = { ...item };
-          if (!(docPayload as any).id) {
-            (docPayload as any).id = docId;
+      if (defaultValue.length > 0) {
+        try {
+          for (const item of defaultValue) {
+            const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
+            const docPayload = { ...item };
+            if (!(docPayload as any).id) {
+              (docPayload as any).id = docId;
+            }
+            await setDoc(doc(db, collectionName, docId), docPayload);
           }
-          await setDoc(doc(db, collectionName, docId), docPayload);
+          await setDoc(seedRef, { seeded: true });
+        } catch (seedErr) {
+          console.warn(`[Seeding collection ${collectionName} failed]`, seedErr);
         }
-        await setDoc(seedRef, { seeded: true });
 
         inMemoryCache[collectionName] = defaultValue;
         try {
