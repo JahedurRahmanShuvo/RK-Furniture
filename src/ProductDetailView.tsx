@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Minus, Plus } from 'lucide-react';
-import { Product } from '../types';
-import BoxWithRays from './BoxWithRays';
+import { Product } from './types';
+import BoxWithRays from './components/BoxWithRays';
 
 interface ProductDetailViewProps {
   prod: Product;

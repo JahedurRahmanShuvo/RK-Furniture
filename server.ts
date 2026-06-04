@@ -432,22 +432,17 @@ async function fetchAndCacheServerCollection<T>(collectionName: string, localFil
       writeJSONFile(localFilePath, firestoreItems);
       return firestoreItems;
     } else {
-      // Seed Firestore from local JSON if available and sync it up
-      const localData = readJSONFile(localFilePath, defaultValue) as T[];
-      if (Array.isArray(localData) && localData.length > 0) {
-        for (const item of localData) {
-          if (item) {
-            const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || Math.random());
-            const docPayload = { ...item };
-            if (!(docPayload as any).id) {
-              (docPayload as any).id = docId;
-            }
-            setDoc(doc(db, collectionName, docId), docPayload).catch(() => {});
-          }
-        }
-      }
-      memoryCache[collectionName] = localData;
-      return localData;
+      // Direct Firestore collection is empty!
+      // To prevent polluting the user's database with unwanted local default products/categories,
+      // we do NOT auto-write or seed default records back to Firestore.
+      // We will only return empty [] for dynamic operational catalogs, or return server defaults without writing them to DB.
+      
+      const fallbackList = (collectionName === 'products' || collectionName === 'categories' || collectionName === 'slides' || collectionName === 'coupons' || collectionName === 'orders')
+        ? []
+        : (readJSONFile(localFilePath, defaultValue) as T[]);
+      
+      memoryCache[collectionName] = fallbackList;
+      return fallbackList;
     }
   } catch (error) {
     console.warn(`[Firestore Fetch Failed for ${collectionName}], using fallback:`, error);
@@ -1154,8 +1149,42 @@ app.get('/api/sessions/active', async (req, res) => {
   }
 });
 
+// Downloader for local logo to prevent hotlinking and ensure instant local loads
+async function ensureLocalLogo() {
+  const logoUrl = "https://i.postimg.cc/63KXZNcz/20260530-101216.png";
+  const publicDir = path.join(process.cwd(), 'public');
+  const distDir = path.join(process.cwd(), 'dist');
+  const publicLogoPath = path.join(publicDir, 'logo.png');
+  const distLogoPath = path.join(distDir, 'logo.png');
+
+  if (!fs.existsSync(publicDir)) {
+    try { fs.mkdirSync(publicDir, { recursive: true }); } catch (_) {}
+  }
+
+  try {
+    const response = await fetch(logoUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    fs.writeFileSync(publicLogoPath, buffer);
+    console.log('[Logo Manager] Cached logo to /public/logo.png');
+    
+    // Also save it inside dist
+    if (!fs.existsSync(distDir)) {
+      try { fs.mkdirSync(distDir, { recursive: true }); } catch (_) {}
+    }
+    fs.writeFileSync(distLogoPath, buffer);
+  } catch (err) {
+    console.warn('[Logo Manager] Failed to pre-download local copy of the logo:', err);
+  }
+}
+
 // --- Vite Middleware / Static Files Setup ---
 async function startServer() {
+  // Pre-fetch and cache the logo locally
+  await ensureLocalLogo().catch(() => {});
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

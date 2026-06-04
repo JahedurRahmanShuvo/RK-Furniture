@@ -42,7 +42,7 @@ import BoxWithRays from './components/BoxWithRays';
 import OrderReceipt from './components/OrderReceipt';
 import BottomNav from './components/BottomNav';
 import Navbar from './components/Navbar';
-import ProductDetailView from './components/ProductDetailView';
+import ProductDetailView from './ProductDetailView';
 import AdminDashboard from './components/AdminDashboard';
 import { auth } from './firebase';
 import { 

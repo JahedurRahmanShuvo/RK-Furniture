@@ -293,38 +293,20 @@ async function fetchAndCacheFirestoreCollection<T>(collectionName: string, defau
       } catch (_) {}
       return items;
     } else {
-      // Seed Firestore with default value if the collection is empty
-      const seedRef = doc(db, 'system_meta', 'seed_status_' + collectionName);
-      const seedSnap = await getDoc(seedRef);
-      const isSeeded = seedSnap.exists() && seedSnap.data()?.seeded === true;
+      // Direct Firestore returned empty.
+      // To prevent polluting the user's Firestore database with unwanted/default products and categories,
+      // we DO NOT auto-seed or write default templates back to Firestore.
+      // We will only use client-side local fallback arrays in-memory without saving them to the DB, keeping your Firestore database completely clean.
+      
+      const fallbackList = (collectionName === 'products' || collectionName === 'categories' || collectionName === 'slides' || collectionName === 'coupons' || collectionName === 'orders')
+        ? [] 
+        : defaultValue;
 
-      if (defaultValue.length > 0) {
-        try {
-          for (const item of defaultValue) {
-            const docId = String((item as any).id || (item as any).orderNumber || (item as any).name || 'gen_' + Math.random().toString(36).substring(2, 9));
-            const docPayload = { ...item };
-            if (!(docPayload as any).id) {
-              (docPayload as any).id = docId;
-            }
-            await setDoc(doc(db, collectionName, docId), docPayload);
-          }
-          await setDoc(seedRef, { seeded: true });
-        } catch (seedErr) {
-          console.warn(`[Seeding collection ${collectionName} failed]`, seedErr);
-        }
-
-        inMemoryCache[collectionName] = defaultValue;
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify(defaultValue));
-        } catch (_) {}
-        return defaultValue;
-      }
-
-      inMemoryCache[collectionName] = [];
+      inMemoryCache[collectionName] = fallbackList;
       try {
-        localStorage.setItem(cacheKey, JSON.stringify([]));
+        localStorage.setItem(cacheKey, JSON.stringify(fallbackList));
       } catch (_) {}
-      return [];
+      return fallbackList;
     }
   } catch (err) {
     console.warn(`[Firestore first-load sync fallback] Failed for ${collectionName}:`, err);

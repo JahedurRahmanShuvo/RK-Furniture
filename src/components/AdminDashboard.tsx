@@ -979,7 +979,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         <div>
           <div className="flex items-center gap-2">
             <img
-              src="https://i.postimg.cc/63KXZNcz/20260530-101216.png"
+              src="/logo.png"
               alt="RK Furniture Logo"
               className="h-10 w-auto object-contain"
               referrerPolicy="no-referrer"
