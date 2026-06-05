@@ -324,11 +324,29 @@ async function fetchAndCacheFirestoreCollection<T>(collectionName: string, defau
       return items;
     } else {
       // Direct Firestore returned empty.
+      
+      if (collectionName === 'shipping_areas') {
+        const wasSeeded = localStorage.getItem('rk_shipping_areas_seeded') === 'true';
+        if (!wasSeeded) {
+          localStorage.setItem('rk_shipping_areas_seeded', 'true');
+          const seededItems: T[] = [];
+          for (const area of defaultValue) {
+            await saveFirestoreDoc('shipping_areas', (area as any).id, area);
+            seededItems.push(area);
+          }
+          inMemoryCache[collectionName] = seededItems;
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(seededItems));
+          } catch (_) {}
+          return seededItems;
+        }
+      }
+
       // To prevent polluting the user's Firestore database with unwanted/default products and categories,
       // we DO NOT auto-seed or write default templates back to Firestore.
       // We will only use client-side local fallback arrays in-memory without saving them to the DB, keeping your Firestore database completely clean.
       
-      const fallbackList = (collectionName === 'products' || collectionName === 'categories' || collectionName === 'slides' || collectionName === 'coupons' || collectionName === 'orders')
+      const fallbackList = (collectionName === 'products' || collectionName === 'categories' || collectionName === 'slides' || collectionName === 'coupons' || collectionName === 'orders' || collectionName === 'shipping_areas')
         ? [] 
         : defaultValue;
 
@@ -514,18 +532,21 @@ async function deleteFirestoreDoc(collectionName: string, docId: string) {
         } catch {}
       }
     } else {
-      const stored = localStorage.getItem(`netlify_${collectionName}`);
-      if (stored) {
-        try {
-          let list = JSON.parse(stored);
-          list = list.filter((item: any) => {
-            const itemId = String(item.id || item.orderNumber || '');
-            return itemId !== String(docId);
-          });
-          localStorage.setItem(`netlify_${collectionName}`, JSON.stringify(list));
-          inMemoryCache[collectionName] = list;
-        } catch {}
+      let list = inMemoryCache[collectionName] || [];
+      if (list.length === 0) {
+        const stored = localStorage.getItem(`netlify_${collectionName}`);
+        if (stored) {
+          try {
+            list = JSON.parse(stored);
+          } catch {}
+        }
       }
+      list = list.filter((item: any) => {
+        const itemId = String(item.id || item.orderNumber || '');
+        return itemId !== String(docId);
+      });
+      localStorage.setItem(`netlify_${collectionName}`, JSON.stringify(list));
+      inMemoryCache[collectionName] = list;
     }
   } catch (err) {
     console.warn(`[Local cache write fallback error] pre-sync delete failed:`, err);

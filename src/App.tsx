@@ -697,13 +697,18 @@ export default function App() {
               devName = modelPart.split('Build')[0].trim();
             }
           } else {
-            if (parts.length > 2) {
-              devName = parts[parts.length - 1].trim();
+            // Search other segments for brand names
+            for (const part of parts) {
+              const trimmed = part.trim();
+              if (/Redmi|Xiaomi|Poco|SM-|CPH|Vivo|Infinix|Tecno|OnePlus|Realme|Oppo/i.test(trimmed)) {
+                devName = trimmed.split('Build')[0].trim();
+                break;
+              }
             }
           }
         }
         
-        let brand = '';
+        let brand = 'Android';
         const uaLower = ua.toLowerCase();
         if (uaLower.includes('samsung') || uaLower.includes('sm-')) {
           brand = 'Samsung';
@@ -726,6 +731,9 @@ export default function App() {
         } else if (uaLower.includes('oneplus')) {
           brand = 'OnePlus';
           devImg = '/phone_pixel.png';
+        } else if (uaLower.includes('realme')) {
+          brand = 'Realme';
+          devImg = '/phone_pixel.png';
         } else if (uaLower.includes('pixel')) {
           brand = 'Google Pixel';
           devImg = '/phone_pixel.png';
@@ -739,7 +747,7 @@ export default function App() {
         
         if (devName === 'Android Mobile' || devName === 'Android' || devName === 'Android Device') {
           devName = brand;
-        } else if (!devName.toLowerCase().includes(brand.toLowerCase())) {
+        } else if (!devName.toLowerCase().includes(brand.toLowerCase()) && brand !== 'Android Device') {
           devName = `${brand} ${devName}`;
         }
       }
@@ -754,6 +762,9 @@ export default function App() {
     }
 
     devName = devName.replace(/\sBuild\/.+$/, '').trim();
+    if (devName.toLowerCase().includes('build')) {
+      devName = devName.split(/build/i)[0].trim();
+    }
     if (devName.length > 28) {
       devName = devName.substring(0, 28);
     }

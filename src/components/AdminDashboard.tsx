@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Trash2, Plus, Search, LogOut, RefreshCw, 
   ShoppingBag, TrendingUp, Box, Edit, Users, 
-  CheckCircle2, Clock, Truck, Laptop, Phone, 
+  CheckCircle2, Clock, Truck, Laptop, Phone, Smartphone, Tablet,
   MapPin, Lock, X, Check, Eye, Tags, MessageCircle, Ticket, ClipboardList, FileText,
   Mail, Calendar
 } from 'lucide-react';
@@ -2003,8 +2003,7 @@ export default function AdminDashboard({
                           })
                           .map((customer, idx) => {
                             const signupLoc = customer.signupLocation || 'Dhaka, Bangladesh';
-                            const signupDev = customer.signupDevice || 'Apple iPhone 15 Pro';
-                            const deviceImg = customer.signupDeviceImage || (signupDev.toLowerCase().includes('laptop') || signupDev.toLowerCase().includes('windows') || signupDev.toLowerCase().includes('macbook') ? '/laptop_macbook.png' : '/phone_iphone.png');
+                            const signupDev = customer.signupDevice || 'Mobile Device';
                             const isSystemAdmin = customer.phone === '01700000000';
 
                             return (
@@ -2086,15 +2085,16 @@ export default function AdminDashboard({
                                     )}
                                   </div>
 
-                                  {/* Premium Device product image preview (Perfect implementation) */}
+                                  {/* Premium Device product image preview (Perfect implementation with Lucide) */}
                                   <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center gap-3 bg-slate-50/50 p-2.5 rounded-xl border border-slate-200/45">
-                                    <div className="w-14 h-14 bg-white border border-slate-200 rounded-lg p-1 shrink-0 flex items-center justify-center overflow-hidden shadow-xs group-hover:scale-105 transition duration-300">
-                                      <img 
-                                        src={deviceImg} 
-                                        alt={signupDev} 
-                                        referrerPolicy="no-referrer"
-                                        className="w-full h-full object-contain" 
-                                      />
+                                    <div className="w-12 h-12 bg-slate-100 border border-slate-200 rounded-xl shrink-0 flex items-center justify-center shadow-xs group-hover:scale-105 transition duration-300 text-slate-500">
+                                      {signupDev.toLowerCase().includes('laptop') || signupDev.toLowerCase().includes('windows') || signupDev.toLowerCase().includes('macbook') || signupDev.toLowerCase().includes('pc') ? (
+                                        <Laptop className="w-5 h-5 text-slate-500" />
+                                      ) : signupDev.toLowerCase().includes('ipad') || signupDev.toLowerCase().includes('tablet') ? (
+                                        <Tablet className="w-5 h-5 text-slate-500" />
+                                      ) : (
+                                        <Smartphone className="w-5 h-5 text-slate-500" />
+                                      )}
                                     </div>
                                     <div className="min-w-0">
                                       <span className="block text-[9.5px] uppercase tracking-wider font-extrabold text-slate-400 font-sans">Signup Device:</span>
