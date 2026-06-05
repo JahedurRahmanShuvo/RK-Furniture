@@ -16,6 +16,11 @@ interface AdminDashboardProps {
   onRefreshProducts: () => void;
   slides?: any[];
   onRefreshSlides?: () => void;
+  categories?: any[];
+  shippingAreas?: any[];
+  storeContact?: any;
+  coupons?: any[];
+  shopPolicies?: any;
 }
 
 // Client-side lightweight image compression for fast & 100% reliable mobile uploads (maximum width/height 1000px, quality 0.8)
@@ -58,7 +63,19 @@ function compressAndReduceImage(file: File, callback: (base64: string) => void) 
   reader.readAsDataURL(file);
 }
 
-export default function AdminDashboard({ user, onLogout, allProducts, onRefreshProducts, slides = [], onRefreshSlides }: AdminDashboardProps) {
+export default function AdminDashboard({ 
+  user, 
+  onLogout, 
+  allProducts, 
+  onRefreshProducts, 
+  slides = [], 
+  onRefreshSlides,
+  categories = [],
+  shippingAreas: shippingAreasProp = [],
+  storeContact: storeContactProp,
+  coupons: couponsProp = [],
+  shopPolicies: shopPoliciesProp
+}: AdminDashboardProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>(allProducts);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -95,7 +112,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [isEditingDescription, setIsEditingDescription] = useState(false);
 
   // Coupon configuration forms
-  const [couponsList, setCouponsList] = useState<any[]>([]);
+  const [couponsList, setCouponsList] = useState<any[]>(couponsProp || []);
   const [isAddingCoupon, setIsAddingCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponPercent, setCouponPercent] = useState(10);
@@ -121,7 +138,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   };
 
   // Slides local states for dynamic customization
-  const [localSlides, setLocalSlides] = useState<any[]>([]);
+  const [localSlides, setLocalSlides] = useState<any[]>(slides || []);
   const [editingSlide, setEditingSlide] = useState<any | null>(null);
   const [isAddingSlide, setIsAddingSlide] = useState(false);
   const [slideTitle, setSlideTitle] = useState('');
@@ -130,20 +147,20 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
   const [slidePosition, setSlidePosition] = useState<'top' | 'middle'>('top');
 
   // Categories dynamic state
-  const [localCategories, setLocalCategories] = useState<any[]>([]);
+  const [localCategories, setLocalCategories] = useState<any[]>(categories || []);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [catName, setCatName] = useState('');
   const [catImage, setCatImage] = useState('');
 
   // Shipping areas customization states
-  const [shippingAreas, setShippingAreas] = useState<any[]>([]);
+  const [shippingAreas, setShippingAreas] = useState<any[]>(shippingAreasProp || []);
   const [isAddingShippingArea, setIsAddingShippingArea] = useState(false);
   const [shipName, setShipName] = useState('');
   const [shipCharge, setShipCharge] = useState<number>(0);
   const [editingShipId, setEditingShipId] = useState<string | null>(null);
 
   // Store Contact state
-  const [storeContact, setStoreContact] = useState<{ phone: string; whatsappUrl: string; hours: string }>({
+  const [storeContact, setStoreContact] = useState<{ phone: string; whatsappUrl: string; hours: string }>(storeContactProp || {
     phone: '01715838191',
     whatsappUrl: 'https://wa.me/8801715838191',
     hours: 'Available 24/7 for support'
@@ -156,7 +173,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     termsConditions: string;
     refundPolicy: string;
     cancelationPolicy: string;
-  }>({
+  }>(shopPoliciesProp || {
     aboutUs: '',
     privacyPolicy: '',
     termsConditions: '',
@@ -166,8 +183,8 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
 
   // Load backend statistics
   const fetchAllData = () => {
-    // 1. Fetch Orders from Express persistent server with admin authorization
-    fetch('/api/orders?phone=' + (user?.phone || '01700000000'))
+    // 1. Fetch Orders from Express persistent server with admin authorization (force fresh data)
+    fetch('/api/orders?phone=' + (user?.phone || '01700000000') + '&fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -177,7 +194,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       .catch((err) => console.error('Admin API error loading orders:', err));
 
     // 2. Fetch Products
-    fetch('/api/products')
+    fetch('/api/products?fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -198,7 +215,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       .catch((err) => console.error('Admin API error loading active sessions:', err));
 
     // 4. Fetch Slides
-    fetch('/api/slides')
+    fetch('/api/slides?fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -208,7 +225,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       .catch((err) => console.error('Admin API error loading slides:', err));
 
     // 5. Fetch Categories
-    fetch('/api/categories')
+    fetch('/api/categories?fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -218,7 +235,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       .catch((err) => console.error('Admin API error loading categories:', err));
 
     // 6. Fetch Shipping Areas
-    fetch('/api/shipping-areas')
+    fetch('/api/shipping-areas?fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -228,7 +245,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       .catch((err) => console.error('Admin API error loading shipping areas:', err));
 
     // 7. Fetch Dynamic Store Contact Settings
-    fetch('/api/store-contact')
+    fetch('/api/store-contact?fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (data && data.phone) {
@@ -238,7 +255,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       .catch((err) => console.error('Admin API error loading store contact:', err));
 
     // 8. Fetch coupons
-    fetch('/api/coupons')
+    fetch('/api/coupons?fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -248,7 +265,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
       .catch((err) => console.error('Admin API error loading coupons list:', err));
 
     // 9. Fetch Shop Policies
-    fetch('/api/shop-policies')
+    fetch('/api/shop-policies?fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (data) {
@@ -268,10 +285,10 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
     const loadInitialSystems = async () => {
       try {
         await Promise.allSettled([
-          fetch('/api/orders?phone=' + (user?.phone || '01700000000')).then((res) => res.json()).then((data) => {
+          fetch('/api/orders?phone=' + (user?.phone || '01700000000') + '&fresh=true').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setOrders(data);
           }),
-          fetch('/api/products').then((res) => res.json()).then((data) => {
+          fetch('/api/products?fresh=true').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) {
               setProducts(data);
               onRefreshProducts();
@@ -280,22 +297,22 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
           fetch('/api/sessions/active').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setActiveSessions(data);
           }),
-          fetch('/api/slides').then((res) => res.json()).then((data) => {
+          fetch('/api/slides?fresh=true').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setLocalSlides(data);
           }),
-          fetch('/api/categories').then((res) => res.json()).then((data) => {
+          fetch('/api/categories?fresh=true').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setLocalCategories(data);
           }),
-          fetch('/api/shipping-areas').then((res) => res.json()).then((data) => {
+          fetch('/api/shipping-areas?fresh=true').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setShippingAreas(data);
           }),
-          fetch('/api/store-contact').then((res) => res.json()).then((data) => {
+          fetch('/api/store-contact?fresh=true').then((res) => res.json()).then((data) => {
             if (data && data.phone) setStoreContact(data);
           }),
-          fetch('/api/coupons').then((res) => res.json()).then((data) => {
+          fetch('/api/coupons?fresh=true').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setCouponsList(data);
           }),
-          fetch('/api/shop-policies').then((res) => res.json()).then((data) => {
+          fetch('/api/shop-policies?fresh=true').then((res) => res.json()).then((data) => {
             if (data) {
               setShopPolicies({
                 aboutUs: data.aboutUs || '',
@@ -310,7 +327,7 @@ export default function AdminDashboard({ user, onLogout, allProducts, onRefreshP
         // Fast artificial timeout to guarantee super smooth transition
         setTimeout(() => {
           setIsSystemLoaded(true);
-        }, 800);
+        }, 150);
       } catch (err) {
         console.error("Initial systems loading error:", err);
         setIsSystemLoaded(true);

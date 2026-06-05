@@ -297,87 +297,85 @@ export default function App() {
         const currentPhone = parsedUser && parsedUser.isLoggedIn && parsedUser.phone ? parsedUser.phone : '';
         const phoneParam = `?phone=${currentPhone}`;
 
-        // Fetch products, slides, and categories in parallel first. Wrap in a Promise.race with a 2.5-second timeout to prevent slow loading
-        await Promise.race([
-          Promise.allSettled([
-            fetch('/api/products')
-              .then((res) => res.json())
-              .then((data) => {
-                if (Array.isArray(data)) {
-                  setProducts(data);
-                  setProductsLoading(false);
-                }
-              })
-              .catch((err) => {
-                console.error('Failed to fetch initial products:', err);
+        // Fetch products, slides, categories, and other collections in parallel.
+        // We remove any Promise.race timeout so that the screen stays on loading until all actual collections are processed successfully.
+        await Promise.allSettled([
+          fetch('/api/products?fresh=true')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setProducts(data);
                 setProductsLoading(false);
-              }),
-            fetch('/api/slides')
-              .then((res) => res.json())
-              .then((data) => {
-                if (Array.isArray(data)) {
-                  setSlides(data);
-                }
-              }),
-            fetch('/api/categories')
-              .then((res) => res.json())
-              .then((data) => {
-                if (Array.isArray(data)) {
-                  setCategories(data);
-                }
-              }),
-            fetch('/api/shipping-areas')
-              .then((res) => res.json())
-              .then((data) => {
-                if (Array.isArray(data) && data.length > 0) {
-                  setShippingAreas(data);
-                  setCheckoutArea((prev) => prev || data[0].id);
-                }
-              }),
-            fetch('/api/store-contact')
-              .then((res) => res.json())
-              .then((data) => {
-                if (data && data.phone) {
-                  setStoreContact(data);
-                }
-              }),
-            fetch('/api/coupons')
-              .then((res) => res.json())
-              .then((data) => {
-                if (Array.isArray(data)) {
-                  setCoupons(data);
-                }
-              }),
-            fetch('/api/orders' + phoneParam)
-              .then((res) => res.json())
-              .then((data) => {
-                if (Array.isArray(data)) {
-                  setOrders(data);
-                }
-              }),
-            fetch('/api/users' + phoneParam)
-              .then((res) => res.json())
-              .then((data) => {
-                if (data && typeof data === 'object') {
-                  setRegisteredUsers(data);
-                  if (currentPhone && data[currentPhone]) {
-                    const registered = data[currentPhone];
-                    if (Array.isArray(registered.addresses)) {
-                      setAddresses(registered.addresses);
-                    }
+              }
+            })
+            .catch((err) => {
+              console.error('Failed to fetch initial products:', err);
+              setProductsLoading(false);
+            }),
+          fetch('/api/slides?fresh=true')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setSlides(data);
+              }
+            }),
+          fetch('/api/categories?fresh=true')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setCategories(data);
+              }
+            }),
+          fetch('/api/shipping-areas?fresh=true')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data) && data.length > 0) {
+                setShippingAreas(data);
+                setCheckoutArea((prev) => prev || data[0].id);
+              }
+            }),
+          fetch('/api/store-contact?fresh=true')
+            .then((res) => res.json())
+            .then((data) => {
+              if (data && data.phone) {
+                setStoreContact(data);
+              }
+            }),
+          fetch('/api/coupons?fresh=true')
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setCoupons(data);
+              }
+            }),
+          fetch('/api/orders' + phoneParam + (phoneParam.includes('?') ? '&fresh=true' : '?fresh=true'))
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setOrders(data);
+              }
+            }),
+          fetch('/api/users' + phoneParam + (phoneParam.includes('?') ? '&fresh=true' : '?fresh=true'))
+            .then((res) => res.json())
+            .then((data) => {
+              if (data && typeof data === 'object') {
+                setRegisteredUsers(data);
+                if (currentPhone && data[currentPhone]) {
+                  const registered = data[currentPhone];
+                  if (Array.isArray(registered.addresses)) {
+                    setAddresses(registered.addresses);
                   }
                 }
-              })
-          ]),
-          new Promise((resolve) => setTimeout(resolve, 2500))
+              }
+            })
         ]);
       } catch (err) {
         console.error('Error during initial sync:', err);
       } finally {
-        // Enforce a minimum aesthetic delay of 150ms so the loading screen doesn't flicker and opens instantly
+        // Enforce a minimum aesthetic delay of 250ms so the loading screen transitions smoothly
         setTimeout(() => {
           setAppLoading(false);
-        }, 150);
+        }, 250);
       }
     };
 
@@ -1316,7 +1314,7 @@ export default function App() {
         onRefreshProducts={handleRefreshProductsFromAdmin}
         slides={slides}
         onRefreshSlides={() => {
-          fetch('/api/slides')
+          fetch('/api/slides?fresh=true')
             .then((res) => res.json())
             .then((data) => {
               if (Array.isArray(data)) {
@@ -1325,6 +1323,11 @@ export default function App() {
             })
             .catch((err) => console.error('Failed to sync slides from admin:', err));
         }}
+        categories={categories}
+        shippingAreas={shippingAreas}
+        storeContact={storeContact}
+        coupons={coupons}
+        shopPolicies={shopPolicies}
       />
     );
   }

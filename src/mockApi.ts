@@ -124,10 +124,19 @@ export function setupMockApiInterceptor() {
   const originalFetch = window.fetch;
 
   // Prefetch collections concurrently on mount so the database connection is pre-heated
-  const collectionsToPrefetch = ['products', 'categories', 'slides', 'shipping-areas', 'store-contact', 'coupons', 'shop-policies'];
-  collectionsToPrefetch.forEach((col) => {
+  // We use the exact Firestore collection names (e.g. shipping_areas with underscores) so keys match correctly
+  const collectionsToPrefetch = [
+    { key: 'products', colName: 'products' },
+    { key: 'categories', colName: 'categories' },
+    { key: 'slides', colName: 'slides' },
+    { key: 'shipping_areas', colName: 'shipping_areas' },
+    { key: 'store_contact', colName: 'store_contact' },
+    { key: 'coupons', colName: 'coupons' },
+    { key: 'shop_policies', colName: 'shop_policies' }
+  ];
+  collectionsToPrefetch.forEach((item) => {
     try {
-      prefetchPromises[col] = fetchAndCacheFirestoreCollection(col, []);
+      prefetchPromises[item.key] = fetchAndCacheFirestoreCollection(item.colName, []);
     } catch (_) {}
   });
 
@@ -198,39 +207,41 @@ let cachedUsers: { [key: string]: any } | null = null;
 const prefetchPromises: { [colName: string]: Promise<any> | null } = {};
 
 // Helper to fetch collection directly from Firestore with fallback & seeding
-async function getFirestoreCollection<T>(collectionName: string, defaultValue: T[]): Promise<T[]> {
+async function getFirestoreCollection<T>(collectionName: string, defaultValue: T[], fresh: boolean = false): Promise<T[]> {
   const cacheKey = `netlify_${collectionName}`;
 
-  // 1. Check in-memory cache
-  if (inMemoryCache[collectionName] && inMemoryCache[collectionName].length > 0) {
-    // Return instantly, fetch in background silently
-    triggerBackgroundRefresh(collectionName, defaultValue).catch(() => {});
-    return inMemoryCache[collectionName] as T[];
-  }
-
-  // 2. Check localStorage (including empty arrays to prevent blank states)
-  try {
-    const stored = localStorage.getItem(cacheKey);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        inMemoryCache[collectionName] = parsed;
-        // Return instantly, fetch in background silently
-        triggerBackgroundRefresh(collectionName, defaultValue).catch(() => {});
-        return parsed as T[];
-      }
+  if (!fresh) {
+    // 1. Check in-memory cache
+    if (inMemoryCache[collectionName] && inMemoryCache[collectionName].length > 0) {
+      // Return instantly, fetch in background silently
+      triggerBackgroundRefresh(collectionName, defaultValue).catch(() => {});
+      return inMemoryCache[collectionName] as T[];
     }
-  } catch (_) {}
 
-  // 3. Fallback: Hook into in-progress background prefetch if available, otherwise do direct fetch
-  const prefetchPromise = prefetchPromises[collectionName];
-  if (prefetchPromise) {
+    // 2. Check localStorage (including empty arrays to prevent blank states)
     try {
-      const result = await prefetchPromise;
-      if (result && Array.isArray(result)) {
-        return result as T[];
+      const stored = localStorage.getItem(cacheKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          inMemoryCache[collectionName] = parsed;
+          // Return instantly, fetch in background silently
+          triggerBackgroundRefresh(collectionName, defaultValue).catch(() => {});
+          return parsed as T[];
+        }
       }
     } catch (_) {}
+
+    // 3. Fallback: Hook into in-progress background prefetch if available, otherwise do direct fetch
+    const prefetchPromise = prefetchPromises[collectionName];
+    if (prefetchPromise) {
+      try {
+        const result = await prefetchPromise;
+        if (result && Array.isArray(result)) {
+          return result as T[];
+        }
+      } catch (_) {}
+    }
   }
 
   return await fetchAndCacheFirestoreCollection(collectionName, defaultValue);
@@ -342,25 +353,27 @@ async function fetchAndCacheFirestoreCollection<T>(collectionName: string, defau
   }
 }
 
-async function getFirestoreUsers(): Promise<{ [key: string]: any }> {
-  // 1. Check in-memory cache
-  if (cachedUsers && Object.keys(cachedUsers).length > 0) {
-    triggerBackgroundUsersRefresh().catch(() => {});
-    return cachedUsers;
-  }
-
-  // 2. Check localStorage
-  try {
-    const stored = localStorage.getItem('rk_registered_users');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-        cachedUsers = parsed;
-        triggerBackgroundUsersRefresh().catch(() => {});
-        return parsed;
-      }
+async function getFirestoreUsers(fresh: boolean = false): Promise<{ [key: string]: any }> {
+  if (!fresh) {
+    // 1. Check in-memory cache
+    if (cachedUsers && Object.keys(cachedUsers).length > 0) {
+      triggerBackgroundUsersRefresh().catch(() => {});
+      return cachedUsers;
     }
-  } catch (_) {}
+
+    // 2. Check localStorage
+    try {
+      const stored = localStorage.getItem('rk_registered_users');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          cachedUsers = parsed;
+          triggerBackgroundUsersRefresh().catch(() => {});
+          return parsed;
+        }
+      }
+    } catch (_) {}
+  }
 
   // 3. Fallback: Await direct Firestore fetch
   return await fetchAndCacheFirestoreUsers();
@@ -538,9 +551,12 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
   let status = 200;
   let responseData: any = null;
 
+  // Extract fresh parameter from url
+  const isFresh = url.includes('fresh=true');
+
   // 1. PRODUCTS
   if (resource === 'products') {
-    const currentProducts = await getFirestoreCollection('products', DEFAULT_PRODUCTS);
+    const currentProducts = await getFirestoreCollection('products', DEFAULT_PRODUCTS, isFresh);
 
     if (method === 'GET') {
       responseData = currentProducts;
@@ -571,7 +587,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
 
   // 2. SLIDES
   else if (resource === 'slides') {
-    const currentSlides = await getFirestoreCollection('slides', DEFAULT_SLIDES);
+    const currentSlides = await getFirestoreCollection('slides', DEFAULT_SLIDES, isFresh);
 
     if (method === 'GET') {
       responseData = currentSlides;
@@ -605,7 +621,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
 
   // 3. CATEGORIES
   else if (resource === 'categories') {
-    const currentCategories = await getFirestoreCollection('categories', DEFAULT_CATEGORIES);
+    const currentCategories = await getFirestoreCollection('categories', DEFAULT_CATEGORIES, isFresh);
 
     if (method === 'GET') {
       responseData = currentCategories;
@@ -630,7 +646,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
 
   // 3b. SHIPPING AREAS
   else if (resource === 'shipping-areas') {
-    const currentAreas = await getFirestoreCollection('shipping_areas', DEFAULT_SHIPPING_AREAS);
+    const currentAreas = await getFirestoreCollection('shipping_areas', DEFAULT_SHIPPING_AREAS, isFresh);
 
     if (method === 'GET') {
       responseData = currentAreas;
@@ -662,7 +678,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
       whatsappUrl: 'https://wa.me/8801715838191',
       hours: 'Available 24/7 for support'
     }];
-    const currentContacts = await getFirestoreCollection('store_contact', defaultContact);
+    const currentContacts = await getFirestoreCollection('store_contact', defaultContact, isFresh);
 
     if (method === 'GET') {
       responseData = currentContacts[0] || defaultContact[0];
@@ -689,7 +705,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
       refundPolicy: 'Refunds are managed based on specific defect reviews within 7 days of package delivery.',
       cancelationPolicy: 'Orders may be cancelled within 12 hours. Returns may attract standard logistics costs.'
     }];
-    const currentPolicies = await getFirestoreCollection('shop_policies', defaultPolicies);
+    const currentPolicies = await getFirestoreCollection('shop_policies', defaultPolicies, isFresh);
 
     if (method === 'GET') {
       responseData = currentPolicies[0] || defaultPolicies[0];
@@ -710,7 +726,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
 
   // 3d. COUPONS
   else if (resource === 'coupons') {
-    const currentCoupons = await getFirestoreCollection('coupons', []);
+    const currentCoupons = await getFirestoreCollection('coupons', [], isFresh);
 
     if (method === 'GET') {
       responseData = currentCoupons;
@@ -730,7 +746,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
 
   // 4. ORDERS
   else if (resource === 'orders') {
-    const currentOrders = await getFirestoreCollection('orders', []);
+    const currentOrders = await getFirestoreCollection('orders', [], isFresh);
 
     if (method === 'GET') {
       responseData = currentOrders;
@@ -759,7 +775,7 @@ async function handleMockRequest(url: string, method: string, init: RequestInit 
 
   // 5. USERS
   else if (resource === 'users') {
-    const currentUsers = await getFirestoreUsers();
+    const currentUsers = await getFirestoreUsers(isFresh);
 
     if (method === 'GET') {
       responseData = currentUsers;
