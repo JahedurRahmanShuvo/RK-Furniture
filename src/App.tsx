@@ -2918,49 +2918,7 @@ export default function App() {
                       />
                     </div>
 
-                    {/* Premium Device & Location Detection Preview */}
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-left space-y-3">
-                      <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
-                        <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#15803d]">Smart Detection Parameters</span>
-                      </div>
-                      
-                      {/* Location selector */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 block">Identified Signup Location / City</label>
-                        <select
-                          value={signupLocation}
-                          onChange={(e) => setSignupLocation(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg py-1 px-2 text-[11px] text-slate-800 focus:outline-none focus:border-[#15803d] font-semibold"
-                        >
-                          <option value="Dhaka, Bangladesh">Dhaka, Bangladesh</option>
-                          <option value="Chittagong, Bangladesh">Chittagong, Bangladesh</option>
-                          <option value="Sylhet, Bangladesh">Sylhet, Bangladesh</option>
-                          <option value="Khulna, Bangladesh">Khulna, Bangladesh</option>
-                          <option value="Dubai, UAE">Dubai, UAE</option>
-                          <option value="Abu Dhabi, UAE">Abu Dhabi, UAE</option>
-                          <option value="Sharjah, UAE">Sharjah, UAE</option>
-                          <option value="Ajman, UAE">Ajman, UAE</option>
-                          <option value="Ras Al Khaimah, UAE">Ras Al Khaimah, UAE</option>
-                          <option value="Fujeirah, UAE">Fujeirah, UAE</option>
-                        </select>
-                      </div>
 
-                      {/* Device identifier block with product photo */}
-                      <div className="flex gap-2.5 items-center bg-white p-2 rounded-lg border border-slate-100">
-                        <div className="w-12 h-12 bg-slate-50 rounded-md p-1 border border-slate-150 flex items-center justify-center overflow-hidden shrink-0">
-                          <img 
-                            src={signupDeviceImage} 
-                            alt={signupDevice} 
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-contain animate-pulse" 
-                          />
-                        </div>
-                        <div className="text-[10px]">
-                          <span className="block font-bold text-slate-700">Detected Smartphone / PC:</span>
-                          <span className="block text-slate-500 font-mono mt-0.5">{signupDevice}</span>
-                        </div>
-                      </div>
-                    </div>
 
                     {/* Button */}
                     <button

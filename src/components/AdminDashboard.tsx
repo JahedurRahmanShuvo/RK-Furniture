@@ -190,7 +190,7 @@ export default function AdminDashboard({
   // Load backend statistics
   const fetchAllData = () => {
     // 1. Fetch Orders from Express persistent server with admin authorization (force fresh data)
-    fetch('/api/orders?phone=' + (user?.phone || '01700000000') + '&fresh=true')
+    fetch('/api/orders?phone=Admin&fresh=true')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -305,7 +305,7 @@ export default function AdminDashboard({
     const loadInitialSystems = async () => {
       try {
         await Promise.allSettled([
-          fetch('/api/orders?phone=' + (user?.phone || '01700000000')).then((res) => res.json()).then((data) => {
+          fetch('/api/orders?phone=Admin').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setOrders(data);
           }),
           fetch('/api/products').then((res) => res.json()).then((data) => {
