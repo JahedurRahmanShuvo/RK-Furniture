@@ -162,6 +162,8 @@ export default function AdminDashboard({
   const [shipName, setShipName] = useState('');
   const [shipCharge, setShipCharge] = useState<number>(0);
   const [editingShipId, setEditingShipId] = useState<string | null>(null);
+  const [pendingDeleteAreaId, setPendingDeleteAreaId] = useState<string | null>(null);
+  const [pendingDeleteUserPhone, setPendingDeleteUserPhone] = useState<string | null>(null);
 
   // Store Contact state
   const [storeContact, setStoreContact] = useState<{ phone: string; whatsappUrl: string; hours: string }>(storeContactProp || {
@@ -701,6 +703,7 @@ export default function AdminDashboard({
     })
       .then((res) => res.json())
       .then(() => {
+        setPendingDeleteAreaId(null);
         fetchAllData();
         showToast('Shipping area deleted successfully.', 'info');
       })
@@ -825,15 +828,13 @@ export default function AdminDashboard({
   };
 
   const deleteUserProfile = (phone: string, userName: string) => {
-    const confirmDelete = window.confirm(`Are you absolutely sure you want to permanently delete the customer profile for ${userName} (${phone}) from the real database? This action cannot be undone.`);
-    if (!confirmDelete) return;
-
     fetch(`/api/users/${phone}`, {
       method: 'DELETE'
     })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
+          setPendingDeleteUserPhone(null);
           setRegisteredUsersList(prev => prev.filter(u => u.phone !== phone));
           showToast(`Customer profile for ${userName} successfully deleted from Google Firestore database.`, 'success');
         } else {
@@ -2025,13 +2026,30 @@ export default function AdminDashboard({
                                     
                                     {/* Action button: delete */}
                                     {!isSystemAdmin ? (
-                                      <button
-                                        onClick={() => deleteUserProfile(customer.phone, customer.name || 'Anonymous')}
-                                        className="p-1 px-1.5 rounded-lg border border-red-50 hover:bg-red-50 text-red-500 hover:text-red-700 transition duration-150 cursor-pointer focus:outline-none"
-                                        title="Permanently Delete customer profile"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
+                                      pendingDeleteUserPhone === customer.phone ? (
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <button
+                                            onClick={() => deleteUserProfile(customer.phone, customer.name || 'Anonymous')}
+                                            className="bg-red-600 hover:bg-red-700 text-white font-bold px-2 py-1 rounded text-[9px] cursor-pointer focus:outline-none"
+                                          >
+                                            Delete?
+                                          </button>
+                                          <button
+                                            onClick={() => setPendingDeleteUserPhone(null)}
+                                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded text-[9px] cursor-pointer focus:outline-none"
+                                          >
+                                            No
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => setPendingDeleteUserPhone(customer.phone)}
+                                          className="p-1 px-1.5 rounded-lg border border-red-50 hover:bg-red-50 text-red-500 hover:text-red-700 transition duration-150 cursor-pointer focus:outline-none shrink-0"
+                                          title="Permanently Delete customer profile"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )
                                     ) : (
                                       <span className="bg-amber-100 text-amber-800 font-bold font-mono text-[8.5px] px-2 py-0.5 rounded-md shrink-0">
                                         OWNER / ADMIN
@@ -2643,17 +2661,33 @@ export default function AdminDashboard({
                         <Edit className="w-3.5 h-3.5" />
                         <span>Edit</span>
                       </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Are you sure you want to delete ${area.name}?`)) {
-                            handleDeleteShippingArea(area.id);
-                          }
-                        }}
-                        className="text-rose-600 hover:text-rose-700 font-bold hover:underline flex items-center gap-1 ml-auto focus:outline-none cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete</span>
-                      </button>
+                      {pendingDeleteAreaId === area.id ? (
+                        <div className="flex items-center gap-1.5 ml-auto">
+                          <span className="text-rose-600 font-bold text-[10px]">Delete?</span>
+                          <button
+                            onClick={() => handleDeleteShippingArea(area.id)}
+                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-2 py-0.5 rounded text-[10px] focus:outline-none cursor-pointer"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            onClick={() => setPendingDeleteAreaId(null)}
+                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-0.5 rounded text-[10px] focus:outline-none cursor-pointer"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setPendingDeleteAreaId(area.id);
+                          }}
+                          className="text-rose-600 hover:text-rose-700 font-bold hover:underline flex items-center gap-1 ml-auto focus:outline-none cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

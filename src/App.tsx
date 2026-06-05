@@ -665,27 +665,99 @@ export default function App() {
   // Auto-detect signup metadata on load
   useEffect(() => {
     const ua = navigator.userAgent;
-    let devName = 'Apple iPhone 15 Pro';
+    let devName = 'Android Mobile';
     let devImg = '/phone_iphone.png';
-    if (/iPhone|iPad/i.test(ua)) {
-      devName = 'Apple iPhone 15 Pro';
-      devImg = '/phone_iphone.png';
-    } else if (/SAMSUNG|Galaxy|SM-/i.test(ua)) {
-      devName = 'Samsung Galaxy S24 Ultra';
-      devImg = '/phone_samsung.png';
-    } else if (/Pixel/i.test(ua)) {
-      devName = 'Google Pixel 8 Pro';
-      devImg = '/phone_pixel.png';
-    } else if (/Android/i.test(ua)) {
-      devName = 'Samsung Galaxy S24 Ultra';
-      devImg = '/phone_samsung.png';
-    } else if (/Macintosh|Mac OS/i.test(ua)) {
-      devName = 'Apple MacBook Pro';
-      devImg = '/laptop_macbook.png';
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    
+    if (isMobile) {
+      if (/iPhone/i.test(ua)) {
+        devName = 'Apple iPhone';
+        devImg = '/phone_iphone.png';
+      } else if (/iPad/i.test(ua)) {
+        devName = 'Apple iPad';
+        devImg = '/phone_iphone.png';
+      } else {
+        // Find Android model inside parenthesis
+        const match = ua.match(/\(([^)]+)\)/);
+        if (match && match[1]) {
+          const parts = match[1].split(';');
+          let foundAndroidIdx = -1;
+          for (let i = 0; i < parts.length; i++) {
+            if (parts[i].trim().includes('Android')) {
+              foundAndroidIdx = i;
+              break;
+            }
+          }
+          if (foundAndroidIdx !== -1 && foundAndroidIdx + 1 < parts.length) {
+            const modelPart = parts[foundAndroidIdx + 1].trim();
+            if (!modelPart.includes('Build') && modelPart.length > 2) {
+              devName = modelPart;
+            } else if (modelPart.includes('Build')) {
+              devName = modelPart.split('Build')[0].trim();
+            }
+          } else {
+            if (parts.length > 2) {
+              devName = parts[parts.length - 1].trim();
+            }
+          }
+        }
+        
+        let brand = '';
+        const uaLower = ua.toLowerCase();
+        if (uaLower.includes('samsung') || uaLower.includes('sm-')) {
+          brand = 'Samsung';
+          devImg = '/phone_samsung.png';
+        } else if (uaLower.includes('xiaomi') || uaLower.includes('redmi') || uaLower.includes('poco')) {
+          brand = 'Xiaomi';
+          devImg = '/phone_pixel.png';
+        } else if (uaLower.includes('infinix')) {
+          brand = 'Infinix';
+          devImg = '/phone_pixel.png';
+        } else if (uaLower.includes('tecno')) {
+          brand = 'Tecno';
+          devImg = '/phone_pixel.png';
+        } else if (uaLower.includes('oppo') || uaLower.includes('cph')) {
+          brand = 'Oppo';
+          devImg = '/phone_pixel.png';
+        } else if (uaLower.includes('vivo')) {
+          brand = 'Vivo';
+          devImg = '/phone_pixel.png';
+        } else if (uaLower.includes('oneplus')) {
+          brand = 'OnePlus';
+          devImg = '/phone_pixel.png';
+        } else if (uaLower.includes('pixel')) {
+          brand = 'Google Pixel';
+          devImg = '/phone_pixel.png';
+        } else if (uaLower.includes('huawei')) {
+          brand = 'Huawei';
+          devImg = '/phone_pixel.png';
+        } else {
+          brand = 'Android Device';
+          devImg = '/phone_samsung.png';
+        }
+        
+        if (devName === 'Android Mobile' || devName === 'Android' || devName === 'Android Device') {
+          devName = brand;
+        } else if (!devName.toLowerCase().includes(brand.toLowerCase())) {
+          devName = `${brand} ${devName}`;
+        }
+      }
     } else {
-      devName = 'Windows Slate Grey PC';
-      devImg = '/laptop_windows.png';
+      if (/Macintosh|Mac OS/i.test(ua)) {
+        devName = 'MacBook Pro';
+        devImg = '/laptop_macbook.png';
+      } else {
+        devName = 'Windows PC';
+        devImg = '/laptop_windows.png';
+      }
     }
+
+    devName = devName.replace(/\sBuild\/.+$/, '').trim();
+    if (devName.length > 28) {
+      devName = devName.substring(0, 28);
+    }
+
     setSignupDevice(devName);
     setSignupDeviceImage(devImg);
 

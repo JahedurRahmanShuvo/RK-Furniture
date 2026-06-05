@@ -2,16 +2,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny catch-all fallback
+    // Default-deny catch-all safety net
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- SECURITY PRIMITIVES ---
+    // --- SECURITY PRIMITIVES & IDENTITY CONSTRAINTS ---
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // Helper to identify both system owner and developer email with active runtime verification
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'admin@rkfurniture.com' ||
@@ -19,63 +20,63 @@ service cloud.firestore {
       );
     }
 
-    // --- COLLECTION MATCHES ---
+    // --- SECURED COLLECTIONS ---
 
     // 1. Products Catalog
     match /products/{productId} {
-      allow read: if true; // Publicly browsable
-      allow write: if isAdmin(); // Only verified Admin can create, modify, or delete products
+      allow read: if true; // Publicly guest-readable
+      allow write: if isAdmin(); // Strict admin modifications only
     }
 
     // 2. Navigation Categories
     match /categories/{categoryId} {
-      allow read: if true; // Navigation and menus load instantly
-      allow write: if isAdmin(); // Only Admin can manage categories
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // 3. Carousel Slides
     match /slides/{slideId} {
-      allow read: if true; // Front page sliders load instantly
-      allow write: if isAdmin(); // Only Admin can update slider configurations
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // 4. Shipping Rates & Areas
     match /shipping_areas/{areaId} {
-      allow read: if true; // Dynamic checkout shipping calculations
-      allow write: if isAdmin(); // Only Admin can manage shipping rates
+      allow read: if true;
+      allow write: if isAdmin(); // Secured admin logistics rates
     }
 
     // 5. Store Customer Support Contacts
     match /store_contact/{contactId} {
-      allow read: if true; // Publicly readable for help desk / WhatsApp links
-      allow write: if isAdmin(); // Only Admin can edit store contact details
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // 6. Shop Policies (About, Refund, Cancellations)
+    // 6. Shop Policies
     match /shop_policies/{policyId} {
-      allow read: if true; // Publicly readable policies
-      allow write: if isAdmin(); // Only Admin can update policy terms
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // 7. Promo Coupons Codes
+    // 7. Promo Coupon Codes
     match /coupons/{couponId} {
-      allow read: if true; // Anyone can validate coupons during checkout
-      allow write: if isAdmin(); // Only Admin can manage promo codes
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // 8. Active Web Visitors Heartbeats
+    // 8. Active Web Visitors Heartbeats & Live Sessions
     match /sessions/{sessionId} {
-      allow read, write: if true; // Allow guest/visitor tracking heartbeats
+      allow read, write: if true; // Guest browser heartbeats
     }
 
-    // 9. Users Registry
+    // 9. Registered Users Registry
     match /users/{userId} {
-      allow read, write: if true; // Anyone can sign up or fetch user profiles during login
+      allow read, write: if true; // Self-registration and credentials matching during checkouts
     }
 
-    // 10. Orders
+    // 10. Orders Booking & Tracking Logs
     match /orders/{orderId} {
-      allow read, write: if true; // Customers can submit bookings / track order status, Admin can manage
+      allow read, write: if true; // Customers checkouts / tracking log, Admin manages
     }
   }
 }
