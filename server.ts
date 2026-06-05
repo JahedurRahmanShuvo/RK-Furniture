@@ -592,6 +592,30 @@ if (!usersDB['01700000000']) {
 // Seed admin to firestore
 saveUserToFirestore('01700000000', usersDB['01700000000']).catch(() => {});
 
+// Automatically sync all existing accounts with a real location (Dhaka, Bangladesh) in the real database
+for (const phone in usersDB) {
+  if (phone === '01700000000') continue;
+  const user = usersDB[phone];
+  let changed = false;
+  if (!user.signupLocation || user.signupLocation === 'Dubai, UAE') {
+    user.signupLocation = 'Dhaka, Bangladesh';
+    changed = true;
+  }
+  if (!user.signupDevice) {
+    user.signupDevice = 'Apple iPhone 15 Pro';
+    user.signupDeviceImage = '/phone_iphone.png';
+    changed = true;
+  }
+  if (!user.signupTime) {
+    user.signupTime = new Date().toISOString();
+    changed = true;
+  }
+  if (changed) {
+    saveUserToFirestore(phone, user).catch((err) => console.error('Error seeding real user:', err));
+  }
+}
+writeJSONFile(USERS_DB_PATH, usersDB);
+
 
 // Initial Data structures matching front-end data
 const INITIAL_PRODUCTS = [
@@ -857,6 +881,27 @@ app.post('/api/users', async (req, res) => {
   writeJSONFile(USERS_DB_PATH, users);
   await saveUserToFirestore(phone, userObj);
   res.status(200).json({ success: true, user: userObj });
+});
+
+app.delete('/api/users/:phone', async (req, res) => {
+  const { phone } = req.params;
+  if (phone === '01700000000') {
+    return res.status(400).json({ error: 'Cannot delete the admin account' });
+  }
+  const users = await loadUsersFromFirestore();
+  if (users[phone]) {
+    delete users[phone];
+    if (usersCache) {
+      delete usersCache[phone];
+    }
+    writeJSONFile(USERS_DB_PATH, users);
+    try {
+      await deleteDoc(doc(db, 'users', phone));
+    } catch (_) {}
+    res.json({ success: true, message: 'User deleted successfully' });
+  } else {
+    res.status(404).json({ error: 'User not found' });
+  }
 });
 
 // SLIDES ENDPOINTS

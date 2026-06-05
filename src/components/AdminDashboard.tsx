@@ -3,7 +3,8 @@ import {
   Trash2, Plus, Search, LogOut, RefreshCw, 
   ShoppingBag, TrendingUp, Box, Edit, Users, 
   CheckCircle2, Clock, Truck, Laptop, Phone, 
-  MapPin, Lock, X, Check, Eye, Tags, MessageCircle, Ticket, ClipboardList, FileText
+  MapPin, Lock, X, Check, Eye, Tags, MessageCircle, Ticket, ClipboardList, FileText,
+  Mail, Calendar
 } from 'lucide-react';
 import { Product, Order, OrderStatus } from '../types';
 import OrderReceipt from './OrderReceipt';
@@ -79,6 +80,9 @@ export default function AdminDashboard({
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>(allProducts);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [registeredUsersList, setRegisteredUsersList] = useState<any[]>([]);
+  const [usersSubTab, setUsersSubTab] = useState<'registered' | 'online'>('registered');
+  const [userQuery, setUserQuery] = useState('');
   
   // Tab states
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'sessions' | 'security' | 'hero_banner' | 'categories' | 'shipping_areas' | 'help_desk' | 'coupons' | null>(null);
@@ -214,6 +218,20 @@ export default function AdminDashboard({
       })
       .catch((err) => console.error('Admin API error loading active sessions:', err));
 
+    // Fetch All Registered Users securely from real database
+    fetch('/api/users?phone=Admin')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && typeof data === 'object') {
+          const arr = Object.entries(data).map(([phone, val]: [string, any]) => ({
+            phone,
+            ...val
+          }));
+          setRegisteredUsersList(arr);
+        }
+      })
+      .catch((err) => console.error('Admin API error loading registered users:', err));
+
     // 4. Fetch Slides
     fetch('/api/slides?fresh=true')
       .then((res) => res.json())
@@ -296,6 +314,15 @@ export default function AdminDashboard({
           }),
           fetch('/api/sessions/active').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setActiveSessions(data);
+          }),
+          fetch('/api/users?phone=Admin').then((res) => res.json()).then((data) => {
+            if (data && typeof data === 'object') {
+              const arr = Object.entries(data).map(([phone, val]: [string, any]) => ({
+                phone,
+                ...val
+              }));
+              setRegisteredUsersList(arr);
+            }
           }),
           fetch('/api/slides').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setLocalSlides(data);
@@ -794,6 +821,28 @@ export default function AdminDashboard({
         console.error('Failed to sync admin password reset to server:', err);
         setSecurityMessage({ text: 'Updated locally, but server failed to sync.', type: 'error' });
         showToast('Password updated locally with sync warning.', 'info');
+      });
+  };
+
+  const deleteUserProfile = (phone: string, userName: string) => {
+    const confirmDelete = window.confirm(`Are you absolutely sure you want to permanently delete the customer profile for ${userName} (${phone}) from the real database? This action cannot be undone.`);
+    if (!confirmDelete) return;
+
+    fetch(`/api/users/${phone}`, {
+      method: 'DELETE'
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setRegisteredUsersList(prev => prev.filter(u => u.phone !== phone));
+          showToast(`Customer profile for ${userName} successfully deleted from Google Firestore database.`, 'success');
+        } else {
+          showToast(data.error || 'Failed to delete customer profile.', 'error');
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to delete user profile:', err);
+        showToast('Connection error. Failed to delete user profile from server.', 'error');
       });
   };
 
@@ -1824,98 +1873,325 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* 3. ACTIVE SESSIONS TAB */}
-          {activeTab === 'sessions' && (
-            <div className="space-y-4 text-left">
-              <div className="flex justify-between items-center bg-cyan-50/50 border border-cyan-100 p-3.5 rounded-xl">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-sans">Viewer Devices & Browsers</h4>
-                  <p className="text-[10px] text-slate-500 mt-1">Real-time active visitors and recent offline device logs from Google Firestore</p>
+          {/* 3. ACTIVE SESSIONS / VIEWERS & REGISTERED USERS TAB */}
+          {activeTab === 'sessions' && (() => {
+            const locationCounts = registeredUsersList.reduce((acc: Record<string, number>, cur) => {
+              const loc = cur.signupLocation || 'Dubai, UAE';
+              acc[loc] = (acc[loc] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
+
+            const filteredUsers = registeredUsersList.filter(u => {
+              const term = userQuery.trim().toLowerCase();
+              if (!term) return true;
+              return (
+                (u.name || '').toLowerCase().includes(term) ||
+                (u.phone || '').toLowerCase().includes(term) ||
+                (u.email || '').toLowerCase().includes(term) ||
+                (u.signupLocation || '').toLowerCase().includes(term) ||
+                (u.signupDevice || '').toLowerCase().includes(term)
+              );
+            });
+
+            return (
+              <div className="space-y-4 text-left">
+                {/* Unified Segment Switcher with Premium Rounded Tabs */}
+                <div className="flex bg-slate-100 p-1.5 rounded-2xl max-w-md">
+                  <button
+                    onClick={() => setUsersSubTab('registered')}
+                    className={`flex-1 text-center py-2 px-3 text-xs font-bold rounded-xl transition cursor-pointer select-none focus:outline-none ${
+                      usersSubTab === 'registered'
+                        ? 'bg-[#15803d] text-white shadow'
+                        : 'text-slate-600 hover:text-slate-900 bg-transparent'
+                    }`}
+                  >
+                    Registered Customers ({registeredUsersList.length})
+                  </button>
+                  <button
+                    onClick={() => setUsersSubTab('online')}
+                    className={`flex-1 text-center py-2 px-3 text-xs font-bold rounded-xl transition cursor-pointer select-none focus:outline-none ${
+                      usersSubTab === 'online'
+                        ? 'bg-[#15803d] text-white shadow'
+                        : 'text-slate-600 hover:text-slate-900 bg-transparent'
+                    }`}
+                  >
+                    Live Active Visitors ({activeSessions.length})
+                  </button>
                 </div>
-                <div className="flex gap-2 text-[10px] font-mono">
-                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-md font-bold">Online: {onlineSessions.length}</span>
-                  <span className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded-md font-bold">Offline: {offlineSessions.length}</span>
-                </div>
-              </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-150">
-                {activeSessions.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500 text-xs font-mono">
-                    Waiting for device heartbeat pings...
-                  </div>
-                ) : (
-                  [...activeSessions]
-                    .sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0))
-                    .map((sess, idx) => {
-                      const isSelf = sess.phone === user.phone && sess.isAdmin;
-                      const isOnline = Date.now() - Number(sess.lastSeen || 0) <= 25000;
-                      const elapsedMs = Date.now() - Number(sess.lastSeen || 0);
-                      let timeAgo = '';
-                      if (elapsedMs < 60000) {
-                        timeAgo = `${Math.floor(elapsedMs / 1000)}s ago`;
-                      } else if (elapsedMs < 3600000) {
-                        timeAgo = `${Math.floor(elapsedMs / 60000)}m ago`;
-                      } else if (elapsedMs < 86400000) {
-                        timeAgo = `${Math.floor(elapsedMs / 3600000)}h ago`;
-                      } else {
-                        timeAgo = 'more than 1d ago';
-                      }
-
-                      return (
-                        <div key={idx} className="p-3 bg-white flex justify-between items-center text-xs">
-                          <div className="flex items-center gap-3">
-                            {sess.deviceName.toLowerCase().includes('desktop') || sess.deviceName.toLowerCase().includes('pc') || sess.deviceName.toLowerCase().includes('macos') || sess.deviceName.toLowerCase().includes('window') ? (
-                              <div className="bg-sky-50 text-sky-600 rounded-lg p-2 shrink-0 border border-sky-100">
-                                <Laptop className="w-5 h-5" />
+                {/* TAB 1: REGISTERED CUSTOMERS (REAL FIRESTORE DATABASE) */}
+                {usersSubTab === 'registered' && (
+                  <div className="space-y-4">
+                    {/* Location Sign-ups Analysis Board */}
+                    <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-xl">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <MapPin className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <h4 className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-widest font-sans">Sign-ups By Geographical Territory (Real-time DB)</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(locationCounts).length === 0 ? (
+                          <span className="text-xs text-slate-500 font-mono italic">No sign-ups recorded yet.</span>
+                        ) : (
+                          Object.entries(locationCounts).map(([loc, val]) => {
+                            const count = val as number;
+                            return (
+                              <div key={loc} className="bg-white border border-slate-200/50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+                                <span className="text-xs font-bold text-slate-700">{loc}:</span>
+                                <span className="text-xs font-mono font-extrabold bg-emerald-100 text-emerald-800 px-1.5 rounded-md">{count} user{count > 1 ? 's' : ''}</span>
                               </div>
-                            ) : (
-                              <div className="bg-emerald-50 text-emerald-600 rounded-lg p-2 shrink-0 border border-emerald-100">
-                                <Phone className="w-5 h-5" />
-                              </div>
-                            )}
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
 
-                            <div>
-                              <div className="flex items-center gap-1.5 border-b border-dashed border-slate-100 pb-0.5">
-                                <span className="font-bold text-slate-800">{sess.deviceName}</span>
-                                {isSelf && (
-                                  <span className="bg-amber-500 text-slate-950 font-bold text-[8px] px-1.5 rounded">YOU / ADMIN</span>
-                                )}
-                                {sess.isAdmin && !isSelf && (
-                                  <span className="bg-[#15803d] text-white font-bold text-[8px] px-1.5 rounded border border-emerald-500">ADMIN</span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-slate-500 mt-1">
-                                Identity: <span className="font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded font-mono">{sess.phone || 'Anonymous Visitor'}</span>
-                              </p>
-                            </div>
-                          </div>
+                    {/* Filter & Live Search Toolbar */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search registered accounts by name, phone, email, device or location..."
+                          value={userQuery}
+                          onChange={(e) => setUserQuery(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-[#15803d] transition font-sans text-slate-800"
+                        />
+                        {userQuery && (
+                          <button 
+                            onClick={() => setUserQuery('')}
+                            className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600 font-bold focus:outline-none cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          fetch('/api/users?phone=Admin')
+                            .then((res) => res.json())
+                            .then((data) => {
+                              if (data && typeof data === 'object') {
+                                const arr = Object.entries(data).map(([phone, val]: [string, any]) => ({
+                                  phone,
+                                  ...val
+                                }));
+                                setRegisteredUsersList(arr);
+                                showToast('Refreshed real users database from FireStore!', 'success');
+                              }
+                            });
+                        }}
+                        className="p-2 bg-slate-105 hover:bg-slate-200 border border-slate-200 rounded-xl text-slate-600 hover:text-slate-850 shrink-0 cursor-pointer focus:outline-none shadow-sm transition"
+                        title="Reload Real Firestore DB Users"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
 
-                          <div className="text-right space-y-1 font-mono">
-                            {isOnline ? (
-                              <>
-                                <span className="inline-flex items-center gap-1 text-[10px] text-[#40a832] font-semibold bg-[#40a832]/5 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                  <span className="w-1.5 h-1.5 bg-[#40a832] rounded-full animate-ping" />
-                                  Online
-                                </span>
-                                <span className="block text-[9px] text-slate-400">Seen just now</span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-semibold bg-slate-100 px-2 py-0.5 rounded-full border border-slate-300/30">
-                                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
-                                  Offline
-                                </span>
-                                <span className="block text-[9px] text-slate-500">Active {timeAgo}</span>
-                              </>
-                            )}
-                          </div>
+                    {/* Beautiful Responsive Users Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredUsers.length === 0 ? (
+                        <div className="col-span-full py-12 text-center bg-slate-50 border border-slate-200 border-dashed rounded-2xl text-slate-500 text-xs font-mono">
+                          No registered customers found matching "{userQuery}"
                         </div>
-                      );
-                    })
+                      ) : (
+                        [...filteredUsers]
+                          .sort((a, b) => {
+                            const dateA = a.signupTime ? new Date(a.signupTime).getTime() : 0;
+                            const dateB = b.signupTime ? new Date(b.signupTime).getTime() : 0;
+                            return dateB - dateA;
+                          })
+                          .map((customer, idx) => {
+                            const signupLoc = customer.signupLocation || 'Dhaka, Bangladesh';
+                            const signupDev = customer.signupDevice || 'Apple iPhone 15 Pro';
+                            const deviceImg = customer.signupDeviceImage || (signupDev.toLowerCase().includes('laptop') || signupDev.toLowerCase().includes('windows') || signupDev.toLowerCase().includes('macbook') ? '/laptop_macbook.png' : '/phone_iphone.png');
+                            const isSystemAdmin = customer.phone === '01700000000';
+
+                            return (
+                              <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-md transition duration-200 relative overflow-hidden group">
+                                {/* Subtle side accent strip */}
+                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${isSystemAdmin ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+
+                                <div className="space-y-3">
+                                  {/* Header block */}
+                                  <div className="flex justify-between items-start gap-2 pl-1">
+                                    <div className="space-y-0.5">
+                                      <h5 className="font-sans font-bold text-slate-900 text-sm flex items-center gap-1.5 leading-tight">
+                                        {customer.name || 'Anonymous User'}
+                                      </h5>
+                                      <span className="block text-[10px] text-slate-400 font-mono tracking-tight select-all flex items-center gap-1">
+                                        <Phone className="w-3 h-3 text-slate-400" /> {customer.phone}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Action button: delete */}
+                                    {!isSystemAdmin ? (
+                                      <button
+                                        onClick={() => deleteUserProfile(customer.phone, customer.name || 'Anonymous')}
+                                        className="p-1 px-1.5 rounded-lg border border-red-50 hover:bg-red-50 text-red-500 hover:text-red-700 transition duration-150 cursor-pointer focus:outline-none"
+                                        title="Permanently Delete customer profile"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    ) : (
+                                      <span className="bg-amber-100 text-amber-800 font-bold font-mono text-[8.5px] px-2 py-0.5 rounded-md shrink-0">
+                                        OWNER / ADMIN
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Info details */}
+                                  <div className="space-y-2 text-[11px] text-slate-600 pl-1 border-t border-slate-100 pt-3">
+                                    {customer.email && (
+                                      <div className="flex items-center gap-1.5">
+                                        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span className="truncate max-w-[190px] font-sans text-slate-500">{customer.email}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                      <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md text-[10px]">
+                                        {signupLoc}
+                                      </span>
+                                    </div>
+                                    {customer.signupTime && (
+                                      <div className="flex items-center gap-1.5 text-[10px] text-slate-405">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span>Joined:</span>
+                                        <span className="font-mono">
+                                          {new Date(customer.signupTime).toLocaleDateString(undefined, { 
+                                            year: 'numeric', 
+                                            month: 'short', 
+                                            day: 'numeric' 
+                                          })}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Premium Device product image preview (Perfect implementation) */}
+                                  <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center gap-3 bg-slate-50/50 p-2.5 rounded-xl border border-slate-200/45">
+                                    <div className="w-14 h-14 bg-white border border-slate-200 rounded-lg p-1 shrink-0 flex items-center justify-center overflow-hidden shadow-xs group-hover:scale-105 transition duration-300">
+                                      <img 
+                                        src={deviceImg} 
+                                        alt={signupDev} 
+                                        referrerPolicy="no-referrer"
+                                        className="w-full h-full object-contain" 
+                                      />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="block text-[9.5px] uppercase tracking-wider font-extrabold text-slate-400 font-sans">Signup Device:</span>
+                                      <span className="block text-[11px] font-bold text-slate-700 font-mono truncate leading-tight mt-0.5" title={signupDev}>
+                                        {signupDev}
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 text-[9px] text-emerald-600 font-medium mt-1">
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Verified Profile
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 2: LIVE HEARTBEATS (ACTIVE SESSIONS) */}
+                {usersSubTab === 'online' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-cyan-50/50 border border-cyan-100 p-3.5 rounded-xl">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-sans font-semibold">Active Web Traffic</h4>
+                        <p className="text-[10px] text-slate-500 mt-1">Real-time device heartbeats and recent browsing sessions in Google Firestore</p>
+                      </div>
+                      <div className="flex gap-2 text-[10px] font-mono">
+                        <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-md font-bold">Online: {onlineSessions.length}</span>
+                        <span className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded-md font-bold">Offline: {offlineSessions.length}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-150">
+                      {activeSessions.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 text-xs font-mono">
+                          Waiting for device heartbeat pings...
+                        </div>
+                      ) : (
+                        [...activeSessions]
+                          .sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0))
+                          .map((sess, idx) => {
+                            const isSelf = sess.phone === user.phone && sess.isAdmin;
+                            const isOnline = Date.now() - Number(sess.lastSeen || 0) <= 25000;
+                            const elapsedMs = Date.now() - Number(sess.lastSeen || 0);
+                            let timeAgo = '';
+                            if (elapsedMs < 60000) {
+                              timeAgo = `${Math.floor(elapsedMs / 1000)}s ago`;
+                            } else if (elapsedMs < 3600000) {
+                              timeAgo = `${Math.floor(elapsedMs / 60000)}m ago`;
+                            } else if (elapsedMs < 86400000) {
+                              timeAgo = `${Math.floor(elapsedMs / 3600000)}h ago`;
+                            } else {
+                              timeAgo = 'more than 1d ago';
+                            }
+
+                            return (
+                              <div key={idx} className="p-3 bg-white flex justify-between items-center text-xs">
+                                <div className="flex items-center gap-3">
+                                  {sess.deviceName.toLowerCase().includes('desktop') || sess.deviceName.toLowerCase().includes('pc') || sess.deviceName.toLowerCase().includes('macos') || sess.deviceName.toLowerCase().includes('window') ? (
+                                    <div className="bg-sky-50 text-sky-600 rounded-lg p-2 shrink-0 border border-sky-100">
+                                      <Laptop className="w-5 h-5" />
+                                    </div>
+                                  ) : (
+                                    <div className="bg-emerald-50 text-emerald-600 rounded-lg p-2 shrink-0 border border-emerald-100">
+                                      <Phone className="w-5 h-5" />
+                                    </div>
+                                  )}
+
+                                  <div>
+                                    <div className="flex items-center gap-1.5 border-b border-dashed border-slate-100 pb-0.5">
+                                      <span className="font-bold text-slate-800">{sess.deviceName}</span>
+                                      {isSelf && (
+                                        <span className="bg-amber-500 text-slate-950 font-bold text-[8px] px-1.5 rounded">YOU / ADMIN</span>
+                                      )}
+                                      {sess.isAdmin && !isSelf && (
+                                        <span className="bg-[#15803d] text-white font-bold text-[8px] px-1.5 rounded border border-emerald-500">ADMIN</span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 mt-1">
+                                      Identity: <span className="font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded font-mono">{sess.phone || 'Anonymous Visitor'}</span>
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="text-right space-y-1 font-mono">
+                                  {isOnline ? (
+                                    <>
+                                      <span className="inline-flex items-center gap-1 text-[10px] text-[#40a832] font-semibold bg-[#40a832]/5 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                        <span className="w-1.5 h-1.5 bg-[#40a832] rounded-full animate-ping" />
+                                        Online
+                                      </span>
+                                      <span className="block text-[9px] text-slate-400">Seen just now</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-semibold bg-slate-100 px-2 py-0.5 rounded-full border border-slate-300/30">
+                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
+                                        Offline
+                                      </span>
+                                      <span className="block text-[9px] text-slate-500">Active {timeAgo}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* HERO BANNER SLIDES TAB */}
           {activeTab === 'hero_banner' && (

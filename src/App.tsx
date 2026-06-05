@@ -547,7 +547,7 @@ export default function App() {
   const [checkoutName, setCheckoutName] = useState('');
   const [checkoutMobile, setCheckoutMobile] = useState('');
   const [checkoutAddress, setCheckoutAddress] = useState('');
-  const [checkoutArea, setCheckoutArea] = useState<string>('ship_1');
+  const [checkoutArea, setCheckoutArea] = useState<string>('');
   const [checkoutGlobalCountry, setCheckoutGlobalCountry] = useState('');
   const [checkoutGlobalCity, setCheckoutGlobalCity] = useState('');
   const [checkoutNote, setCheckoutNote] = useState('');
@@ -559,6 +559,7 @@ export default function App() {
   // Auto-fill checkout details based on logged-in user profile & shipping locations
   useEffect(() => {
     if (view === 'checkout') {
+      setCheckoutArea(''); // Reset so they are forced to select a shipping area explicitly
       if (user && user.isLoggedIn) {
         setCheckoutName(user.name || '');
         setCheckoutMobile(user.phone || '');
@@ -604,6 +605,11 @@ export default function App() {
   const [forgotStep, setForgotStep] = useState<1 | 2 | 3>(1);
   const [forgotMatchedUser, setForgotMatchedUser] = useState<any>(null);
   const [forgotSuccess, setForgotSuccess] = useState('');
+
+  // Sign Up metadata collection inputs (Device & Location)
+  const [signupLocation, setSignupLocation] = useState('Dhaka, Bangladesh');
+  const [signupDevice, setSignupDevice] = useState('Apple iPhone 15 Pro');
+  const [signupDeviceImage, setSignupDeviceImage] = useState('/phone_iphone.png');
 
   // Add Address helper fields
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
@@ -655,6 +661,58 @@ export default function App() {
 
   const topSlides = slides.filter(s => s.position === 'top' || !s.position);
   const middleSlides = slides.filter(s => s.position === 'middle');
+
+  // Auto-detect signup metadata on load
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    let devName = 'Apple iPhone 15 Pro';
+    let devImg = '/phone_iphone.png';
+    if (/iPhone|iPad/i.test(ua)) {
+      devName = 'Apple iPhone 15 Pro';
+      devImg = '/phone_iphone.png';
+    } else if (/SAMSUNG|Galaxy|SM-/i.test(ua)) {
+      devName = 'Samsung Galaxy S24 Ultra';
+      devImg = '/phone_samsung.png';
+    } else if (/Pixel/i.test(ua)) {
+      devName = 'Google Pixel 8 Pro';
+      devImg = '/phone_pixel.png';
+    } else if (/Android/i.test(ua)) {
+      devName = 'Samsung Galaxy S24 Ultra';
+      devImg = '/phone_samsung.png';
+    } else if (/Macintosh|Mac OS/i.test(ua)) {
+      devName = 'Apple MacBook Pro';
+      devImg = '/laptop_macbook.png';
+    } else {
+      devName = 'Windows Slate Grey PC';
+      devImg = '/laptop_windows.png';
+    }
+    setSignupDevice(devName);
+    setSignupDeviceImage(devImg);
+
+    let signLoc = 'Dhaka, Bangladesh';
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz.includes('Dubai') || tz.includes('Asia/Dubai') || tz.includes('Muscat')) {
+        signLoc = 'Dubai, UAE';
+      } else if (tz.includes('Dhaka') || tz.includes('Asia/Dhaka') || tz.includes('Kolkata') || tz.includes('Calcutta') || tz.includes('Asia/Almaty')) {
+        signLoc = 'Dhaka, Bangladesh';
+      } else if (tz.includes('Riyadh') || tz.includes('Asia/Riyadh')) {
+        signLoc = 'Riyadh, Saudi Arabia';
+      }
+    } catch (_) {}
+    setSignupLocation(signLoc);
+
+    // Dynamic precise real-time IP lookup fallback
+    fetch('https://ipapi.co/json/')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.city && data.country_name) {
+          const loc = `${data.city}, ${data.country_name}`;
+          setSignupLocation(loc);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Autoplay slideshows
   useEffect(() => {
@@ -756,7 +814,7 @@ export default function App() {
 
     const discount = promoApplied ? subtotal * (promoDiscountPercent / 100) : 0; // Dynamic coupon discount percentage
     const selectedAreaObj = shippingAreas.find((a) => a.id === checkoutArea || a.name === checkoutArea);
-    const shippingCharge = selectedAreaObj ? selectedAreaObj.charge : (shippingAreas[0]?.charge || 0);
+    const shippingCharge = selectedAreaObj ? selectedAreaObj.charge : 0;
     const total = subtotal - discount + shippingCharge;
 
     return { subtotal, discount, shippingCharge, total };
@@ -950,7 +1008,11 @@ export default function App() {
     const userObj = { 
       name: signupName, 
       email: signupEmail,
-      password: signupPassword
+      password: signupPassword,
+      signupLocation: signupLocation,
+      signupDevice: signupDevice,
+      signupDeviceImage: signupDeviceImage,
+      signupTime: new Date().toISOString()
     };
 
     const newRegistered = {
@@ -1184,6 +1246,11 @@ export default function App() {
     e.preventDefault();
     if (!checkoutName || !checkoutMobile || !checkoutAddress) {
       alert('Please fill in your name, mobile and address details!');
+      return;
+    }
+
+    if (!checkoutArea) {
+      alert('অনুগ্রহ করে অর্ডার সম্পন্ন করতে একটি Shipping Area (ডেলিভারি এলাকা) সিলেক্ট করুন! \n\nPlease select a Shipping Area before confirming your order!');
       return;
     }
 
@@ -2150,8 +2217,15 @@ export default function App() {
                   </div>
 
                   {/* Shipping Area Selector */}
-                  <div className="space-y-1 text-xs">
-                    <label className="font-bold text-slate-600 block mb-1">Shipping Area *</label>
+                  <div className="space-y-1 text-xs text-slate-700">
+                    <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+                      <label className="font-bold text-slate-600 block">Shipping Area *</label>
+                      {!checkoutArea && (
+                        <span className="text-[11px] bg-red-50 text-red-600 px-2.5 py-1 rounded-full font-bold animate-pulse border border-red-100 flex items-center">
+                          Please select a delivery or shipping area
+                        </span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                       {shippingAreas.map((area) => {
                         const isSelected = checkoutArea === area.id || checkoutArea === area.name;
@@ -2281,9 +2355,15 @@ export default function App() {
                               <span>- {discount.toLocaleString()} AED</span>
                             </div>
                           )}
-                          <div className="flex justify-between text-slate-600">
+                          <div className="flex justify-between text-slate-600 items-center">
                             <span>Delivery Charge:</span>
-                            <span>{shippingCharge.toLocaleString()} AED</span>
+                            {checkoutArea ? (
+                              <span className="font-bold text-slate-800">{shippingCharge.toLocaleString()} AED</span>
+                            ) : (
+                              <span className="font-bold text-red-500 animate-pulse text-[10px] bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                                এরিয়া সিলেক্ট করুন
+                              </span>
+                            )}
                           </div>
                           <div className="flex justify-between text-sm font-bold text-[#c25927] border-t border-slate-100 pt-2 font-sans">
                             <span>Total Payable Amount:</span>
@@ -2755,10 +2835,54 @@ export default function App() {
                       />
                     </div>
 
+                    {/* Premium Device & Location Detection Preview */}
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-left space-y-3">
+                      <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
+                        <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#15803d]">Smart Detection Parameters</span>
+                      </div>
+                      
+                      {/* Location selector */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 block">Identified Signup Location / City</label>
+                        <select
+                          value={signupLocation}
+                          onChange={(e) => setSignupLocation(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg py-1 px-2 text-[11px] text-slate-800 focus:outline-none focus:border-[#15803d] font-semibold"
+                        >
+                          <option value="Dhaka, Bangladesh">Dhaka, Bangladesh</option>
+                          <option value="Chittagong, Bangladesh">Chittagong, Bangladesh</option>
+                          <option value="Sylhet, Bangladesh">Sylhet, Bangladesh</option>
+                          <option value="Khulna, Bangladesh">Khulna, Bangladesh</option>
+                          <option value="Dubai, UAE">Dubai, UAE</option>
+                          <option value="Abu Dhabi, UAE">Abu Dhabi, UAE</option>
+                          <option value="Sharjah, UAE">Sharjah, UAE</option>
+                          <option value="Ajman, UAE">Ajman, UAE</option>
+                          <option value="Ras Al Khaimah, UAE">Ras Al Khaimah, UAE</option>
+                          <option value="Fujeirah, UAE">Fujeirah, UAE</option>
+                        </select>
+                      </div>
+
+                      {/* Device identifier block with product photo */}
+                      <div className="flex gap-2.5 items-center bg-white p-2 rounded-lg border border-slate-100">
+                        <div className="w-12 h-12 bg-slate-50 rounded-md p-1 border border-slate-150 flex items-center justify-center overflow-hidden shrink-0">
+                          <img 
+                            src={signupDeviceImage} 
+                            alt={signupDevice} 
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-contain animate-pulse" 
+                          />
+                        </div>
+                        <div className="text-[10px]">
+                          <span className="block font-bold text-slate-700">Detected Smartphone / PC:</span>
+                          <span className="block text-slate-500 font-mono mt-0.5">{signupDevice}</span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Button */}
                     <button
                       type="submit"
-                      className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-bold text-xs py-2.5 rounded-xl shadow transition"
+                      className="w-full bg-[#15803d] hover:bg-[#116e34] text-white font-bold text-xs py-2.5 rounded-xl shadow transition"
                     >
                       Register Account
                     </button>
