@@ -2,6 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Default deny catch-all fallback
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // --- SECURITY PRIMITIVES ---
     function isSignedIn() {
       return request.auth != null;
@@ -14,68 +19,63 @@ service cloud.firestore {
       );
     }
 
-    // --- EXPLICIT RESOURCE SCHEMAS (Everyone can read, authenticated admins/backend can write) ---
+    // --- COLLECTION MATCHES ---
 
     // 1. Products Catalog
     match /products/{productId} {
-      allow read: if true; // Visitors can view products instantly
-      allow write: if true; // Seamless updates from admin dashboard and seeding
+      allow read: if true; // Publicly browsable
+      allow write: if isAdmin(); // Only verified Admin can create, modify, or delete products
     }
 
     // 2. Navigation Categories
     match /categories/{categoryId} {
       allow read: if true; // Navigation and menus load instantly
-      allow write: if true; // Create/edit categories
+      allow write: if isAdmin(); // Only Admin can manage categories
     }
 
     // 3. Carousel Slides
     match /slides/{slideId} {
       allow read: if true; // Front page sliders load instantly
-      allow write: if true; // Manage sliders
+      allow write: if isAdmin(); // Only Admin can update slider configurations
     }
 
     // 4. Shipping Rates & Areas
     match /shipping_areas/{areaId} {
       allow read: if true; // Dynamic checkout shipping calculations
-      allow write: if true; // Manage shipping rates
+      allow write: if isAdmin(); // Only Admin can manage shipping rates
     }
 
     // 5. Store Customer Support Contacts
     match /store_contact/{contactId} {
-      allow read: if true; // Help desk & WhatsApp contact links
-      allow write: if true; // Modify support contact detail
+      allow read: if true; // Publicly readable for help desk / WhatsApp links
+      allow write: if isAdmin(); // Only Admin can edit store contact details
     }
 
     // 6. Shop Policies (About, Refund, Cancellations)
     match /shop_policies/{policyId} {
-      allow read: if true; // Policy terms are publicly visible
-      allow write: if true; // Edit policies
+      allow read: if true; // Publicly readable policies
+      allow write: if isAdmin(); // Only Admin can update policy terms
     }
 
     // 7. Promo Coupons Codes
     match /coupons/{couponId} {
-      allow read: if true; // Public coupon verification
-      allow write: if true; // Manage active vouchers
+      allow read: if true; // Anyone can validate coupons during checkout
+      allow write: if isAdmin(); // Only Admin can manage promo codes
     }
 
     // 8. Active Web Visitors Heartbeats
     match /sessions/{sessionId} {
-      allow read, write: if true; // Enable real-time visitor tracking
+      allow read, write: if true; // Allow guest/visitor tracking heartbeats
     }
 
     // 9. Users Registry
     match /users/{userId} {
-      allow read, write: if true; // Allow client sign up & lookups smoothly
+      allow read, write: if true; // Anyone can sign up or fetch user profiles during login
     }
 
     // 10. Orders
     match /orders/{orderId} {
-      allow read, write: if true; // Enable smooth checkout & check order status
-    }
-
-    // --- FAIL-SAFE BACKUP RULE ---
-    match /{document=**} {
-      allow read, write: if true; // Fallback to avoid any unexpected blockage
+      allow read, write: if true; // Customers can submit bookings / track order status, Admin can manage
     }
   }
 }

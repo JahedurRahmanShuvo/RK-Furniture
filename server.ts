@@ -45,9 +45,19 @@ const defaultFirebaseConfig = {
   measurementId: "G-7V079KPE44"
 };
 
-// Force server to connect exclusively to the production rk-furniture-e0b7e project for perfect synchronization
+// Force server to connect exclusively to the production rk-furniture-e0b7e project for perfect synchronization unless we have a local workspace config
+const CONFIG_PATH = path.join(process.cwd(), 'firebase-applet-config.json');
 let firebaseConfig: any = defaultFirebaseConfig;
-console.log('[Firebase config forced to production]', firebaseConfig.projectId);
+if (fs.existsSync(CONFIG_PATH)) {
+  try {
+    firebaseConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+    console.log('[Firebase Config] Loaded from applet config file:', firebaseConfig.projectId, firebaseConfig.firestoreDatabaseId || '(default)');
+  } catch (err) {
+    console.error('[Firebase Config] Failed to read or parse local applet configuration, falling back:', err);
+  }
+} else {
+  console.log('[Firebase Config] Forced to production fallback:', firebaseConfig.projectId);
+}
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = firebaseConfig.firestoreDatabaseId 

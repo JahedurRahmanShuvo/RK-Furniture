@@ -2,8 +2,10 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
-// Actual production Firebase project containing all products, categories, and business data
-export const firebaseConfig = {
+import appletConfig from "../firebase-applet-config.json";
+
+// We prefer the AI Studio applet configuration for perfect rules deployment and syncing
+export const firebaseConfig = appletConfig || {
   apiKey: "AIzaSyDfuSipIqlV69-bzFg24F52DLf6GR7PYwQ",
   authDomain: "rk-furniture-e0b7e.firebaseapp.com",
   projectId: "rk-furniture-e0b7e",
@@ -16,7 +18,9 @@ export const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = (firebaseConfig as any).firestoreDatabaseId 
+  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
+  : getFirestore(app);
 
 // Safe initialization of Analytics only in browser environment
 if (typeof window !== "undefined") {

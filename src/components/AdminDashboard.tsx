@@ -285,10 +285,10 @@ export default function AdminDashboard({
     const loadInitialSystems = async () => {
       try {
         await Promise.allSettled([
-          fetch('/api/orders?phone=' + (user?.phone || '01700000000') + '&fresh=true').then((res) => res.json()).then((data) => {
+          fetch('/api/orders?phone=' + (user?.phone || '01700000000')).then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setOrders(data);
           }),
-          fetch('/api/products?fresh=true').then((res) => res.json()).then((data) => {
+          fetch('/api/products').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) {
               setProducts(data);
               onRefreshProducts();
@@ -297,22 +297,22 @@ export default function AdminDashboard({
           fetch('/api/sessions/active').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setActiveSessions(data);
           }),
-          fetch('/api/slides?fresh=true').then((res) => res.json()).then((data) => {
+          fetch('/api/slides').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setLocalSlides(data);
           }),
-          fetch('/api/categories?fresh=true').then((res) => res.json()).then((data) => {
+          fetch('/api/categories').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setLocalCategories(data);
           }),
-          fetch('/api/shipping-areas?fresh=true').then((res) => res.json()).then((data) => {
+          fetch('/api/shipping-areas').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setShippingAreas(data);
           }),
-          fetch('/api/store-contact?fresh=true').then((res) => res.json()).then((data) => {
+          fetch('/api/store-contact').then((res) => res.json()).then((data) => {
             if (data && data.phone) setStoreContact(data);
           }),
-          fetch('/api/coupons?fresh=true').then((res) => res.json()).then((data) => {
+          fetch('/api/coupons').then((res) => res.json()).then((data) => {
             if (Array.isArray(data)) setCouponsList(data);
           }),
-          fetch('/api/shop-policies?fresh=true').then((res) => res.json()).then((data) => {
+          fetch('/api/shop-policies').then((res) => res.json()).then((data) => {
             if (data) {
               setShopPolicies({
                 aboutUs: data.aboutUs || '',
