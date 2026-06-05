@@ -123,6 +123,14 @@ const activeSessions: { [id: string]: any } = {};
 export function setupMockApiInterceptor() {
   const originalFetch = window.fetch;
 
+  // Prefetch collections concurrently on mount so the database connection is pre-heated
+  const collectionsToPrefetch = ['products', 'categories', 'slides', 'shipping-areas', 'store-contact', 'coupons', 'shop-policies'];
+  collectionsToPrefetch.forEach((col) => {
+    try {
+      prefetchPromises[col] = fetchAndCacheFirestoreCollection(col, []);
+    } catch (_) {}
+  });
+
   const mockFetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const url = typeof input === 'string' ? input : (input instanceof URL ? input.href : (input as Request).url);
     const method = (init?.method || 'GET').toUpperCase();
@@ -187,6 +195,7 @@ import {
 // In-memory caches for Netlify browsers to provide instant responses
 const inMemoryCache: { [colName: string]: any[] } = {};
 let cachedUsers: { [key: string]: any } | null = null;
+const prefetchPromises: { [colName: string]: Promise<any> | null } = {};
 
 // Helper to fetch collection directly from Firestore with fallback & seeding
 async function getFirestoreCollection<T>(collectionName: string, defaultValue: T[]): Promise<T[]> {
@@ -199,12 +208,12 @@ async function getFirestoreCollection<T>(collectionName: string, defaultValue: T
     return inMemoryCache[collectionName] as T[];
   }
 
-  // 2. Check localStorage
+  // 2. Check localStorage (including empty arrays to prevent blank states)
   try {
     const stored = localStorage.getItem(cacheKey);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         inMemoryCache[collectionName] = parsed;
         // Return instantly, fetch in background silently
         triggerBackgroundRefresh(collectionName, defaultValue).catch(() => {});
@@ -213,7 +222,17 @@ async function getFirestoreCollection<T>(collectionName: string, defaultValue: T
     }
   } catch (_) {}
 
-  // 3. Fallback: Await direct Firestore fetch
+  // 3. Fallback: Hook into in-progress background prefetch if available, otherwise do direct fetch
+  const prefetchPromise = prefetchPromises[collectionName];
+  if (prefetchPromise) {
+    try {
+      const result = await prefetchPromise;
+      if (result && Array.isArray(result)) {
+        return result as T[];
+      }
+    } catch (_) {}
+  }
+
   return await fetchAndCacheFirestoreCollection(collectionName, defaultValue);
 }
 

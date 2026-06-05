@@ -253,7 +253,7 @@ export default function OrderReceipt({ order, onClose }: OrderReceiptProps) {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <img
-                  src="/logo.png"
+                  src="https://i.postimg.cc/63KXZNcz/20260530-101216.png"
                   alt="RK Furniture Logo"
                   className="h-12 w-auto object-contain"
                   referrerPolicy="no-referrer"
